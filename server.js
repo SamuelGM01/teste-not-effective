@@ -1,26 +1,31 @@
+import express from 'express';
+import mongoose from 'mongoose';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-require('dotenv').config();
-const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
-const bodyParser = require('body-parser');
-const path = require('path');
+dotenv.config();
+
+// Recreate __dirname for ES Modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 10000;
+const PORT = process.env.PORT || 3000;
 
-app.use(cors());
-app.use(bodyParser.json({ limit: '50mb' }));
-
-// --- MONGODB CONNECTION ---
-// Using the provided connection string. Added 'cobblemon' database name.
-const MONGO_URI = "mongodb+srv://Corazon_user:gUDEULzHoaWp0PGo@cluster0.u8wxlkg.mongodb.net/cobblemon?appName=Cluster0";
+// MongoDB Connection
+const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://Corazon_user:gUDEULzHoaWp0PGo@cluster0.u8wxlkg.mongodb.net/cobblemon?retryWrites=true&w=majority&appName=Cluster0";
 
 mongoose.connect(MONGO_URI)
-    .then(() => console.log('✅ Connected to MongoDB Atlas'))
-    .catch(err => console.error('❌ MongoDB Connection Error:', err));
+    .then(() => console.log('✅ Conectado ao MongoDB Atlas'))
+    .catch(err => console.error('❌ Erro no MongoDB:', err));
+
+app.use(cors());
+app.use(express.json({ limit: '10mb' })); // Replaces body-parser
 
 // --- SCHEMAS ---
+
 const TrainerSchema = new mongoose.Schema({
     nick: { type: String, required: true, unique: true },
     password: { type: String, required: true },
@@ -28,6 +33,7 @@ const TrainerSchema = new mongoose.Schema({
     insignias: [String],
     createdAt: { type: Date, default: Date.now }
 });
+const Trainer = mongoose.model('Trainer', TrainerSchema);
 
 const GymSchema = new mongoose.Schema({
     tipo: { type: String, required: true, unique: true },
@@ -35,6 +41,7 @@ const GymSchema = new mongoose.Schema({
     liderSkin: String,
     time: [Object]
 });
+const Gym = mongoose.model('Gym', GymSchema);
 
 const TournamentSchema = new mongoose.Schema({
     name: String,
@@ -45,6 +52,7 @@ const TournamentSchema = new mongoose.Schema({
     currentRound: { type: Number, default: 0 },
     createdAt: { type: Number, default: Date.now }
 });
+const Tournament = mongoose.model('Tournament', TournamentSchema);
 
 const InviteSchema = new mongoose.Schema({
     tournamentId: String,
@@ -53,34 +61,37 @@ const InviteSchema = new mongoose.Schema({
     toNick: String,
     status: { type: String, default: 'pending' }
 });
-
-const Trainer = mongoose.model('Trainer', TrainerSchema);
-const Gym = mongoose.model('Gym', GymSchema);
-const Tournament = mongoose.model('Tournament', TournamentSchema);
 const Invite = mongoose.model('Invite', InviteSchema);
 
+// --- INITIALIZATION ---
 const GYM_TYPES = [
     "agua", "dragao", "eletrico", "fada", "fantasma", "fogo", 
     "gelo", "inseto", "lutador", "metalico", "normal", "pedra", 
     "planta", "psiquico", "sombrio", "terra", "venenoso", "voador"
 ];
 
-async function initGyms() {
+const initializeGyms = async () => {
     try {
         const count = await Gym.countDocuments();
         if (count === 0) {
-            console.log("Creating initial gyms...");
-            for (const type of GYM_TYPES) {
-                await Gym.create({ tipo: type, lider: "", time: [null,null,null,null,null,null] });
+            console.log("⚙️ Criando ginásios...");
+            for (const tipo of GYM_TYPES) {
+                await Gym.create({
+                    tipo,
+                    lider: "",
+                    time: [null, null, null, null, null, null]
+                });
             }
         }
-    } catch (e) {
-        console.error("Error initializing gyms:", e);
+    } catch (error) {
+        console.error("Erro ao inicializar ginásios:", error);
     }
-}
-initGyms();
+};
+initializeGyms();
 
 // --- API ROUTES ---
+
+// 1. Trainers
 app.get('/api/trainers', async (req, res) => {
     try {
         const trainers = await Trainer.find();
@@ -92,8 +103,8 @@ app.post('/api/trainers', async (req, res) => {
     try {
         const { nick, password, customSkin } = req.body;
         const exists = await Trainer.findOne({ nick: { $regex: new RegExp(`^${nick}$`, 'i') } });
-        if (exists) return res.status(400).json({ error: "Nick already exists" });
-        
+        if (exists) return res.status(400).json({ error: "Nick já existe" });
+
         const newTrainer = new Trainer({ nick, password, customSkin, insignias: [] });
         await newTrainer.save();
         res.json(newTrainer);
@@ -104,9 +115,8 @@ app.post('/api/login', async (req, res) => {
     try {
         const { nick, password } = req.body;
         const trainer = await Trainer.findOne({ nick: { $regex: new RegExp(`^${nick}$`, 'i') } });
-        if (!trainer || trainer.password !== password) {
-            return res.status(401).json({ error: "Invalid credentials" });
-        }
+        if (!trainer) return res.status(404).json({ error: "Usuário não encontrado" });
+        if (trainer.password !== password) return res.status(401).json({ error: "Senha incorreta" });
         res.json(trainer);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -120,20 +130,21 @@ app.delete('/api/trainers/:id', async (req, res) => {
 
 app.post('/api/insignias', async (req, res) => {
     try {
-        const { trainerId, insigniaId } = req.body;
+        const { trainerId, badgeId } = req.body;
         const trainer = await Trainer.findById(trainerId);
         if (!trainer) return res.status(404).json({ error: "Trainer not found" });
 
-        if (trainer.insignias.includes(insigniaId)) {
-            trainer.insignias = trainer.insignias.filter(id => id !== insigniaId);
+        if (trainer.insignias.includes(badgeId)) {
+            trainer.insignias = trainer.insignias.filter(b => b !== badgeId);
         } else {
-            trainer.insignias.push(insigniaId);
+            trainer.insignias.push(badgeId);
         }
         await trainer.save();
         res.json(trainer);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// 2. Gyms
 app.get('/api/gyms', async (req, res) => {
     try {
         const gyms = await Gym.find();
@@ -143,10 +154,10 @@ app.get('/api/gyms', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/gyms/update', async (req, res) => {
+app.post('/api/gyms', async (req, res) => {
     try {
-        const { tipo, lider, liderSkin, time } = req.body;
-        await Gym.findOneAndUpdate({ tipo }, { lider, liderSkin, time });
+        const { tipo, lider, time, liderSkin } = req.body;
+        await Gym.findOneAndUpdate({ tipo }, { lider, time, liderSkin });
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -159,6 +170,7 @@ app.post('/api/gyms/reset', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// 3. Tournaments
 app.get('/api/tournaments', async (req, res) => {
     try {
         const tournaments = await Tournament.find();
@@ -175,23 +187,190 @@ app.post('/api/tournaments', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/tournaments/:id/update', async (req, res) => {
+app.post('/api/tournaments/:id/join', async (req, res) => {
     try {
-        const { participants, matches, status, currentRound } = req.body;
-        const updateData = {};
-        if (participants) updateData.participants = participants;
-        if (matches) updateData.matches = matches;
-        if (status) updateData.status = status;
-        if (currentRound) updateData.currentRound = currentRound;
-        
-        await Tournament.findByIdAndUpdate(req.params.id, updateData);
+        const { trainerId, nick, customSkin, pokemon, gymType } = req.body;
+        const t = await Tournament.findById(req.params.id);
+        if (!t) return res.status(404).json({ error: "Torneio não encontrado" });
+
+        if (t.participants.some(p => p.trainerId === trainerId)) {
+            return res.status(400).json({ error: "Já inscrito" });
+        }
+
+        t.participants.push({ trainerId, nick, customSkin, pokemon, gymType });
+        t.markModified('participants');
+        await t.save();
+        res.json(t);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/tournaments/:id/leave', async (req, res) => {
+    try {
+        const { trainerId } = req.body;
+        const t = await Tournament.findById(req.params.id);
+        if (!t) return res.status(404).json({ error: "Torneio não encontrado" });
+
+        // Unlink partner if exists
+        const me = t.participants.find(p => p.trainerId === trainerId);
+        if (me && me.partnerId) {
+            const partner = t.participants.find(p => p.trainerId === me.partnerId);
+            if (partner) {
+                partner.partnerId = undefined;
+                partner.partnerNick = undefined;
+            }
+        }
+
+        t.participants = t.participants.filter(p => p.trainerId !== trainerId);
+        t.markModified('participants');
+        await t.save();
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.get('/api/invites/:nick', async (req, res) => {
+app.post('/api/tournaments/:id/start', async (req, res) => {
     try {
-        const invites = await Invite.find({ toNick: { $regex: new RegExp(`^${req.params.nick}$`, 'i') }, status: 'pending' });
+        const t = await Tournament.findById(req.params.id);
+        if (!t) return res.status(404).json({ error: "Torneio não encontrado" });
+
+        const count = t.participants.length;
+        if (count % 2 !== 0) return res.status(400).json({ error: "Número ímpar de jogadores" });
+
+        const shuffled = [...t.participants].sort(() => Math.random() - 0.5);
+        const newMatches = [];
+        const generateId = () => Math.random().toString(36).substr(2, 9);
+
+        if (t.format === 'monotype') {
+            for (let i = 0; i < shuffled.length; i += 2) {
+                newMatches.push({
+                    id: generateId(),
+                    round: 1,
+                    participants: [shuffled[i], shuffled[i+1]],
+                    winners: [],
+                    bans: {}
+                });
+            }
+        } else {
+            const processedIds = new Set();
+            const pairs = [];
+            for (const p of shuffled) {
+                if (processedIds.has(p.trainerId)) continue;
+                const partner = shuffled.find(s => s.trainerId === p.partnerId);
+                if (partner) {
+                    pairs.push([p, partner]);
+                    processedIds.add(p.trainerId);
+                    processedIds.add(partner.trainerId);
+                }
+            }
+            for (let i = 0; i < pairs.length; i += 2) {
+                if (i+1 < pairs.length) {
+                    newMatches.push({
+                        id: generateId(),
+                        round: 1,
+                        participants: [...pairs[i], ...pairs[i+1]],
+                        winners: [],
+                        bans: {}
+                    });
+                }
+            }
+        }
+
+        t.status = 'active';
+        t.currentRound = 1;
+        t.matches = newMatches;
+        t.markModified('matches');
+        await t.save();
+        res.json(t);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/tournaments/:id/matches/:matchId/win', async (req, res) => {
+    try {
+        const { winners } = req.body;
+        const t = await Tournament.findById(req.params.id);
+        const match = t.matches.find(m => m.id === req.params.matchId);
+        if (!match) return res.status(404).json({ error: "Partida não encontrada" });
+
+        match.winners = winners;
+        
+        const roundMatches = t.matches.filter(m => m.round === t.currentRound);
+        const allFinished = roundMatches.every(m => m.winners && m.winners.length > 0);
+
+        if (allFinished) {
+            const winnersIds = roundMatches.flatMap(m => m.winners);
+            const isOver = t.format === 'monotype' ? winnersIds.length === 1 : winnersIds.length === 2;
+
+            if (isOver) {
+                t.status = 'completed';
+            } else {
+                t.currentRound += 1;
+                const nextParticipants = t.participants.filter(p => winnersIds.includes(p.trainerId));
+                const shuffled = nextParticipants.sort(() => Math.random() - 0.5);
+                const generateId = () => Math.random().toString(36).substr(2, 9);
+
+                if (t.format === 'monotype') {
+                    for (let i = 0; i < shuffled.length; i += 2) {
+                        if (i+1 < shuffled.length) {
+                            t.matches.push({ id: generateId(), round: t.currentRound, participants: [shuffled[i], shuffled[i+1]], winners: [], bans: {} });
+                        } else {
+                            t.matches.push({ id: generateId(), round: t.currentRound, participants: [shuffled[i]], winners: [shuffled[i].trainerId], bans: {} });
+                        }
+                    }
+                } else {
+                    const processedIds = new Set();
+                    const teams = [];
+                    for (const p of shuffled) {
+                        if (processedIds.has(p.trainerId)) continue;
+                        const partner = shuffled.find(s => s.trainerId === p.partnerId);
+                        if (partner) {
+                            teams.push([p, partner]);
+                            processedIds.add(p.trainerId);
+                            processedIds.add(partner.trainerId);
+                        }
+                    }
+                    for (let i = 0; i < teams.length; i += 2) {
+                        if (i+1 < teams.length) {
+                            t.matches.push({ id: generateId(), round: t.currentRound, participants: [...teams[i], ...teams[i+1]], winners: [], bans: {} });
+                        } else {
+                            t.matches.push({ id: generateId(), round: t.currentRound, participants: [...teams[i]], winners: teams[i].map(x=>x.trainerId), bans: {} });
+                        }
+                    }
+                }
+            }
+        }
+
+        t.markModified('matches');
+        await t.save();
+        res.json(t);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/tournaments/:id/matches/:matchId/ban', async (req, res) => {
+    try {
+        const { targetTrainerId, pokemonName } = req.body;
+        const t = await Tournament.findById(req.params.id);
+        const match = t.matches.find(m => m.id === req.params.matchId);
+        
+        if (!match.bans) match.bans = {};
+        if (!match.bans[targetTrainerId]) match.bans[targetTrainerId] = [];
+
+        const bans = match.bans[targetTrainerId];
+        if (bans.includes(pokemonName)) {
+            match.bans[targetTrainerId] = bans.filter(n => n !== pokemonName);
+        } else {
+            match.bans[targetTrainerId].push(pokemonName);
+        }
+
+        t.markModified('matches');
+        await t.save();
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// 4. Invites
+app.get('/api/invites', async (req, res) => {
+    try {
+        const { nick } = req.query;
+        const invites = await Invite.find({ toNick: { $regex: new RegExp(`^${nick}$`, 'i') }, status: 'pending' });
         res.json(invites);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -199,8 +378,8 @@ app.get('/api/invites/:nick', async (req, res) => {
 app.post('/api/invites', async (req, res) => {
     try {
         const { tournamentId, tournamentName, fromNick, toNick } = req.body;
-        const existing = await Invite.findOne({ tournamentId, fromNick, toNick, status: 'pending' });
-        if (existing) return res.status(400).json({ error: "Invite already sent" });
+        const exists = await Invite.findOne({ tournamentId, fromNick, toNick, status: 'pending' });
+        if (exists) return res.status(400).json({ error: "Convite já enviado" });
 
         const invite = new Invite({ tournamentId, tournamentName, fromNick, toNick });
         await invite.save();
@@ -223,13 +402,11 @@ app.post('/api/invites/:id/respond', async (req, res) => {
                     const p1 = tournament.participants[p1Index];
                     const p2 = tournament.participants[p2Index];
                     
-                    // Link them
                     p1.partnerId = p2.trainerId;
                     p1.partnerNick = p2.nick;
                     p2.partnerId = p1.trainerId;
                     p2.partnerNick = p1.nick;
                     
-                    // Mongoose mixed array update requires marking modified
                     tournament.markModified('participants');
                     await tournament.save();
                 }
@@ -242,7 +419,8 @@ app.post('/api/invites/:id/respond', async (req, res) => {
 // --- SERVE REACT FRONTEND (MUST BE LAST) ---
 app.use(express.static(path.join(__dirname, 'dist')));
 
-app.get('*', (req, res) => {
+// Wildcard route using Regex to avoid PathError in modern Express/path-to-regexp
+app.get(/.*/, (req, res) => {
     res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
