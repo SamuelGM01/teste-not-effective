@@ -1,3 +1,4 @@
+
 import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
@@ -39,7 +40,10 @@ const GymSchema = new mongoose.Schema({
     tipo: { type: String, required: true, unique: true },
     lider: { type: String, default: "" },
     liderSkin: String,
-    time: [Object]
+    time: [Object],
+    challengers: [String],
+    activeBattle: Object, // GymBattle { id, challengerNick, date, time, status, result }
+    history: [Object] // Array of GymBattle
 });
 const Gym = mongoose.model('Gym', GymSchema);
 
@@ -79,7 +83,10 @@ const initializeGyms = async () => {
                 await Gym.create({
                     tipo,
                     lider: "",
-                    time: [null, null, null, null, null, null]
+                    time: [null, null, null, null, null, null],
+                    challengers: [],
+                    activeBattle: null,
+                    history: []
                 });
             }
         }
@@ -157,7 +164,11 @@ app.get('/api/gyms', async (req, res) => {
 app.post('/api/gyms', async (req, res) => {
     try {
         const { tipo, lider, time, liderSkin } = req.body;
-        await Gym.findOneAndUpdate({ tipo }, { lider, time, liderSkin });
+        await Gym.findOneAndUpdate(
+            { tipo }, 
+            { lider, time, liderSkin }, 
+            { upsert: true }
+        );
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -165,8 +176,39 @@ app.post('/api/gyms', async (req, res) => {
 app.post('/api/gyms/reset', async (req, res) => {
     try {
         const { tipo } = req.body;
-        await Gym.findOneAndUpdate({ tipo }, { lider: "", liderSkin: null, time: [null,null,null,null,null,null] });
+        await Gym.findOneAndUpdate(
+            { tipo }, 
+            { 
+                lider: "", 
+                liderSkin: null, 
+                time: [null,null,null,null,null,null], 
+                challengers: [],
+                activeBattle: null,
+                history: []
+            }
+        );
         res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/gyms/:tipo/challenge', async (req, res) => {
+    try {
+        const { tipo } = req.params;
+        const { nick } = req.body;
+        
+        const gym = await Gym.findOne({ tipo });
+        if (!gym) return res.status(404).json({ error: "Ginásio não encontrado" });
+
+        if (!gym.challengers) gym.challengers = [];
+
+        if (gym.challengers.includes(nick)) {
+            gym.challengers = gym.challengers.filter(c => c !== nick);
+        } else {
+            gym.challengers.push(nick);
+        }
+        
+        await gym.save();
+        res.json({ success: true, challengers: gym.challengers });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -210,7 +252,6 @@ app.post('/api/tournaments/:id/leave', async (req, res) => {
         const t = await Tournament.findById(req.params.id);
         if (!t) return res.status(404).json({ error: "Torneio não encontrado" });
 
-        // Unlink partner if exists
         const me = t.participants.find(p => p.trainerId === trainerId);
         if (me && me.partnerId) {
             const partner = t.participants.find(p => p.trainerId === me.partnerId);
@@ -250,8 +291,8 @@ app.post('/api/tournaments/:id/start', async (req, res) => {
                 });
             }
         } else {
-            const processedIds = new Set();
             const pairs = [];
+            const processedIds = new Set();
             for (const p of shuffled) {
                 if (processedIds.has(p.trainerId)) continue;
                 const partner = shuffled.find(s => s.trainerId === p.partnerId);
@@ -316,8 +357,8 @@ app.post('/api/tournaments/:id/matches/:matchId/win', async (req, res) => {
                         }
                     }
                 } else {
-                    const processedIds = new Set();
                     const teams = [];
+                    const processedIds = new Set();
                     for (const p of shuffled) {
                         if (processedIds.has(p.trainerId)) continue;
                         const partner = shuffled.find(s => s.trainerId === p.partnerId);
@@ -416,10 +457,9 @@ app.post('/api/invites/:id/respond', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// --- SERVE REACT FRONTEND (MUST BE LAST) ---
+// --- SERVE REACT FRONTEND ---
 app.use(express.static(path.join(__dirname, 'dist')));
 
-// Wildcard route using Regex to avoid PathError in modern Express/path-to-regexp
 app.get(/.*/, (req, res) => {
     res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
