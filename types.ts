@@ -4,23 +4,11 @@ export interface Pokemon {
     sprite: string;
 }
 
-export interface GymBattle {
-    id: string;
-    challengerNick: string;
-    date: string;
-    time: string;
-    status: 'scheduled' | 'completed';
-    result?: 'leader_win' | 'challenger_win';
-}
-
 export interface Gym {
     tipo: string;
     lider: string;
     liderSkin?: string; // Custom skin support
     time: (Pokemon | null)[];
-    challengers?: string[]; // Lista de nicks interessados
-    activeBattle?: GymBattle | null; // Batalha agendada atual
-    history?: GymBattle[]; // Histórico de batalhas
 }
 
 export interface Trainer {
