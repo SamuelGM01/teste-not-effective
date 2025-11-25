@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { GYM_TYPES, Gym, TYPE_COLORS, getTypeIcon, getSkinUrl, GymBattle } from '../types';
 import * as api from '../services/mockBackend';
@@ -675,14 +674,14 @@ const Gyms: React.FC = () => {
                             >
                                 {/* 
                                     Circular Gym Icon with explicit shadow border for Online status.
-                                    REMOVED animate-pulse-glow. Using pure CSS shadow for glow.
-                                    Image has filter: none to prevent blurring.
+                                    REMOVED animate-pulse-glow which was causing image blur.
+                                    Replaced with explicit box-shadow logic that applies strictly to the container border.
                                 */}
                                 <div 
                                     className={`
                                         w-20 h-20 rounded-full flex items-center justify-center border-4 transition-all overflow-hidden relative
                                         ${isOnline 
-                                            ? 'border-green-500 shadow-[0_0_15px_rgba(34,197,94,0.8)]' // Strong green shadow, NO opacity animation on container
+                                            ? 'border-green-500 shadow-[0_0_15px_rgba(34,197,94,0.8)]' // Stronger shadow, NO opacity animation on container
                                             : 'border-neutral-800 shadow-lg group-hover:border-white'
                                         }
                                     `}
@@ -692,7 +691,7 @@ const Gyms: React.FC = () => {
                                         src={getTypeIcon(tipo)} 
                                         alt={tipo}
                                         className="w-12 h-12 object-contain brightness-0 invert opacity-90 drop-shadow-sm"
-                                        style={{ filter: 'none' }} // Force no blur
+                                        style={{ filter: 'none' }} // Force no filter on image
                                     />
                                 </div>
                                 <div className="flex flex-col items-center">
