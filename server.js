@@ -15,7 +15,7 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// MongoDB Connection using the provided string, with database name specified
+// CORRECTED MongoDB Connection String
 const MONGO_URI = "mongodb+srv://Corazon_user:gUDEULzHoaWp0PGo@cluster0.u8wxlkg.mongodb.net/cobblemon?appName=Cluster0";
 
 mongoose.connect(MONGO_URI)
@@ -25,16 +25,24 @@ mongoose.connect(MONGO_URI)
 app.use(cors());
 app.use(express.json({ limit: '10mb' })); // Replaces body-parser
 
+// --- SCHEMA OPTIONS TO STANDARDIZE IDs ---
+const schemaOptions = {
+  toJSON: { virtuals: true }, // Inclui 'id' virtual quando o documento é convertido para JSON
+  toObject: { virtuals: true },
+  id: true, // Garante que o virtual 'id' seja criado
+  _id: true // Mantém o _id original
+};
+
 // --- SCHEMAS ---
 
 const TrainerSchema = new mongoose.Schema({
-    _id: { type: String, default: uuidv4 },
+    // _id será gerado automaticamente pelo Mongoose
     nick: { type: String, required: true, unique: true },
     password: { type: String, required: true },
     customSkin: String,
     insignias: [String],
     createdAt: { type: Date, default: Date.now }
-});
+}, schemaOptions);
 const Trainer = mongoose.model('Trainer', TrainerSchema);
 
 const GymSchema = new mongoose.Schema({
@@ -45,11 +53,10 @@ const GymSchema = new mongoose.Schema({
     challengers: [String],
     activeBattle: Object, 
     history: [Object] 
-});
+}, schemaOptions);
 const Gym = mongoose.model('Gym', GymSchema);
 
 const TournamentSchema = new mongoose.Schema({
-    id: { type: String, default: uuidv4 },
     name: String,
     format: String,
     status: { type: String, default: 'pending' },
@@ -57,17 +64,16 @@ const TournamentSchema = new mongoose.Schema({
     matches: [Object],
     currentRound: { type: Number, default: 0 },
     createdAt: { type: Number, default: Date.now }
-});
+}, schemaOptions);
 const Tournament = mongoose.model('Tournament', TournamentSchema);
 
 const InviteSchema = new mongoose.Schema({
-    id: { type: String, default: uuidv4 },
     tournamentId: String,
     tournamentName: String,
     fromNick: String,
     toNick: String,
     status: { type: String, default: 'pending' }
-});
+}, schemaOptions);
 const Invite = mongoose.model('Invite', InviteSchema);
 
 // --- INITIALIZATION ---
@@ -100,7 +106,7 @@ const initializeGyms = async () => {
 };
 initializeGyms();
 
-// --- API ROUTES ---
+// --- API ROUTES (all routes now return 'id' automatically) ---
 
 // 1. Trainers
 app.get('/api/trainers', async (req, res) => {
