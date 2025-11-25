@@ -1,8 +1,9 @@
+
 import React, { useEffect, useState } from 'react';
 import { GYM_TYPES, Gym, TYPE_COLORS, getTypeIcon, getSkinUrl, GymBattle } from '../types';
 import * as api from '../services/mockBackend';
 import { useAuth } from '../contexts/AuthContext';
-import { X, Search, Lock, Zap, Ghost, Snowflake, Bug, HandMetal, Settings, Wind, Cloud, Droplets, Leaf, Eye, Sparkles, Hexagon, Circle, Triangle, AlertCircle, WifiOff, Swords, Users, Flag, Calendar, Clock, History, Trophy, Skull, Crown, User } from 'lucide-react';
+import { X, Search, Lock, Zap, Ghost, Snowflake, Bug, HandMetal, Settings, Wind, Cloud, Droplets, Leaf, Eye, Sparkles, Hexagon, Circle, Triangle, AlertCircle, WifiOff, Swords, Users, Flag, Calendar, Clock, History, Trophy, Skull, Crown } from 'lucide-react';
 
 const GymBackgroundEffect: React.FC<{ type: string }> = ({ type }) => {
     switch (type) {
@@ -383,15 +384,6 @@ const GymBackgroundEffect: React.FC<{ type: string }> = ({ type }) => {
     }
 };
 
-interface ScheduledBattle {
-    gymType: string;
-    opponent: string;
-    date: string;
-    time: string;
-    role: 'Líder' | 'Desafiante';
-    status: string;
-}
-
 const Gyms: React.FC = () => {
     const { user, isAdmin } = useAuth();
     const [gyms, setGyms] = useState<Record<string, Gym>>({});
@@ -411,10 +403,6 @@ const Gyms: React.FC = () => {
     const [schedulingNick, setSchedulingNick] = useState("");
     const [scheduleDate, setScheduleDate] = useState("");
     const [scheduleTime, setScheduleTime] = useState("");
-
-    // My Battles Modal
-    const [showMyBattles, setShowMyBattles] = useState(false);
-    const [myBattles, setMyBattles] = useState<ScheduledBattle[]>([]);
 
     // Tabs
     const [activeTab, setActiveTab] = useState<'time' | 'historico'>('time');
@@ -597,42 +585,6 @@ const Gyms: React.FC = () => {
         }
     };
 
-    const handleOpenMyBattles = () => {
-        if (!user) return alert("Faça login para ver seus confrontos.");
-        
-        const battles: ScheduledBattle[] = [];
-        
-        Object.values(gyms).forEach((gym: Gym) => {
-            if (gym.activeBattle && gym.activeBattle.status === 'scheduled') {
-                // Case 1: User is the Leader
-                if (gym.lider && gym.lider.toLowerCase() === user.nick.toLowerCase()) {
-                    battles.push({
-                        gymType: gym.tipo,
-                        opponent: gym.activeBattle.challengerNick,
-                        date: gym.activeBattle.date,
-                        time: gym.activeBattle.time,
-                        role: 'Líder',
-                        status: 'active'
-                    });
-                }
-                // Case 2: User is the Challenger
-                else if (gym.activeBattle.challengerNick.toLowerCase() === user.nick.toLowerCase()) {
-                    battles.push({
-                        gymType: gym.tipo,
-                        opponent: gym.lider,
-                        date: gym.activeBattle.date,
-                        time: gym.activeBattle.time,
-                        role: 'Desafiante',
-                        status: 'active'
-                    });
-                }
-            }
-        });
-
-        setMyBattles(battles);
-        setShowMyBattles(true);
-    };
-
     // Safe fallback for render
     const currentGym = selectedType ? (gyms[selectedType] || { tipo: selectedType, lider: "", time: [null,null,null,null,null,null], challengers: [], activeBattle: null, history: [] }) : null;
     const isManaged = currentGym && currentGym.lider !== "";
@@ -660,10 +612,11 @@ const Gyms: React.FC = () => {
                     {user ? "Clique em uma insígnia para ver ou gerenciar!" : "Faça Login para gerenciar ginásios."}
                 </p>
 
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-8 justify-items-center mb-10">
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-8 justify-items-center">
                     {GYM_TYPES.map((tipo) => {
                         const gym = gyms[tipo];
                         const leaderNick = gym?.lider || "";
+                        // Check if leader is online. NOTE: mcsrvstat.us might return names in different case
                         const isOnline = leaderNick && onlinePlayers.some(p => p.toLowerCase() === leaderNick.toLowerCase());
 
                         return (
@@ -672,16 +625,11 @@ const Gyms: React.FC = () => {
                                 onClick={() => handleOpenGym(tipo)}
                                 className="group cursor-pointer flex flex-col items-center gap-2 transition-transform hover:scale-110"
                             >
-                                {/* 
-                                    Circular Gym Icon with explicit shadow border for Online status.
-                                    REMOVED animate-pulse-glow which was causing image blur.
-                                    Replaced with explicit box-shadow logic that applies strictly to the container border.
-                                */}
                                 <div 
                                     className={`
                                         w-20 h-20 rounded-full flex items-center justify-center border-4 transition-all overflow-hidden relative
                                         ${isOnline 
-                                            ? 'border-green-500 shadow-[0_0_15px_rgba(34,197,94,0.8)]' // Stronger shadow, NO opacity animation on container
+                                            ? 'border-green-500 shadow-[0_0_15px_rgba(34,197,94,0.8)] animate-[pulse_2s_infinite]' 
                                             : 'border-neutral-800 shadow-lg group-hover:border-white'
                                         }
                                     `}
@@ -691,7 +639,7 @@ const Gyms: React.FC = () => {
                                         src={getTypeIcon(tipo)} 
                                         alt={tipo}
                                         className="w-12 h-12 object-contain brightness-0 invert opacity-90 drop-shadow-sm"
-                                        style={{ filter: 'none' }} // Force no filter on image
+                                        style={{ filter: 'none' }} 
                                     />
                                 </div>
                                 <div className="flex flex-col items-center">
@@ -706,17 +654,6 @@ const Gyms: React.FC = () => {
                         );
                     })}
                 </div>
-
-                {user && (
-                    <div className="flex justify-center border-t border-neutral-800 pt-8">
-                        <button 
-                            onClick={handleOpenMyBattles}
-                            className="flex items-center gap-2 bg-neutral-900 border border-crimson text-white px-6 py-3 hover:bg-crimson transition-colors shadow-lg font-pixel text-xs uppercase tracking-wider"
-                        >
-                            <Swords size={16} /> Meus Confrontos
-                        </button>
-                    </div>
-                )}
             </div>
 
             {/* Modals */}
@@ -726,6 +663,7 @@ const Gyms: React.FC = () => {
                         
                         <GymBackgroundEffect type={currentGym.tipo} />
 
+                        {/* Header Tabs */}
                         <div className="relative z-20 flex border-b border-neutral-800 bg-neutral-950/80">
                             <button 
                                 onClick={() => setActiveTab('time')}
@@ -974,58 +912,6 @@ const Gyms: React.FC = () => {
                                 <input type="time" value={scheduleTime} onChange={e => setScheduleTime(e.target.value)} className="w-full bg-black border border-neutral-700 text-white p-2 text-sm font-sans focus:border-indigo-500 outline-none" />
                             </div>
                             <button onClick={confirmSchedule} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-pixel text-xs py-3 mt-2">CONFIRMAR AGENDAMENTO</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* My Battles Modal */}
-            {showMyBattles && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/95 backdrop-blur-md p-4">
-                    <div className="bg-neutral-900 border border-neutral-700 w-full max-w-2xl p-6 shadow-2xl relative flex flex-col max-h-[80vh]">
-                        <button onClick={() => setShowMyBattles(false)} className="absolute top-4 right-4 text-gray-500 hover:text-white"><X size={20} /></button>
-                        <h3 className="font-pixel text-white text-sm mb-6 text-center uppercase border-b border-neutral-800 pb-4 flex items-center justify-center gap-2">
-                            <Swords size={16} className="text-crimson"/> Meus Confrontos Agendados
-                        </h3>
-                        
-                        <div className="overflow-y-auto custom-scrollbar space-y-3 flex-grow">
-                            {myBattles.length === 0 ? (
-                                <div className="text-center text-gray-500 text-xs py-12 flex flex-col items-center gap-3">
-                                    <Swords size={32} className="opacity-20"/>
-                                    Você não tem batalhas agendadas.
-                                </div>
-                            ) : (
-                                myBattles.map((battle, idx) => (
-                                    <div key={idx} className="bg-black/40 border border-neutral-800 p-4 flex flex-col md:flex-row items-center gap-4 group hover:border-neutral-600 transition-colors">
-                                        <div className="flex items-center gap-4 w-full md:w-1/3">
-                                            <div className="w-10 h-10 rounded-full flex items-center justify-center border border-neutral-700 bg-neutral-900">
-                                                <img src={getTypeIcon(battle.gymType)} className="w-6 h-6 brightness-0 invert" />
-                                            </div>
-                                            <div className="flex flex-col">
-                                                <span className="text-crimson font-pixel text-[10px] uppercase">Ginásio {battle.gymType}</span>
-                                                <span className="text-white font-bold text-xs font-sans">{battle.role}</span>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex-1 flex flex-col items-center text-center">
-                                            <span className="text-[9px] text-gray-500 uppercase tracking-widest mb-1">Contra</span>
-                                            <div className="flex items-center gap-2">
-                                                <User size={14} className="text-gray-400"/>
-                                                <span className="text-white font-pixel text-sm">{battle.opponent}</span>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex flex-col items-end gap-1 w-full md:w-1/3 text-right">
-                                            <div className="flex items-center gap-2 text-indigo-300 text-xs font-sans bg-indigo-900/20 px-2 py-1 rounded">
-                                                <Calendar size={12} /> {battle.date}
-                                            </div>
-                                            <div className="flex items-center gap-2 text-gray-400 text-xs font-sans">
-                                                <Clock size={12} /> {battle.time}
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))
-                            )}
                         </div>
                     </div>
                 </div>
