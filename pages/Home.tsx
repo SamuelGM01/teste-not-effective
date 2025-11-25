@@ -1,5 +1,5 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import * as api from '../services/mockBackend';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -12,8 +12,29 @@ const Home: React.FC = () => {
     const [password, setPassword] = useState('');
     const [customSkin, setCustomSkin] = useState<string>('');
     const [error, setError] = useState('');
+    const [serverStatus, setServerStatus] = useState<{online: boolean, players: number}>({ online: false, players: 0 });
+    const [copied, setCopied] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const navigate = useNavigate();
+
+    useEffect(() => {
+        const fetchServerStatus = async () => {
+            try {
+                const response = await fetch('https://api.mcsrvstat.us/2/jasper.lura.host:35570');
+                const data = await response.json();
+                setServerStatus({
+                    online: data.online,
+                    players: data.players ? data.players.online : 0
+                });
+            } catch (err) {
+                console.error("Erro ao buscar status do servidor", err);
+            }
+        };
+
+        fetchServerStatus();
+        const interval = setInterval(fetchServerStatus, 60000); // Atualiza a cada 1 minuto
+        return () => clearInterval(interval);
+    }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -43,31 +64,16 @@ const Home: React.FC = () => {
                 const img = new Image();
                 img.src = event.target?.result as string;
                 img.onload = () => {
-                    // Create a canvas to crop the head
                     const canvas = document.createElement('canvas');
                     const ctx = canvas.getContext('2d');
-                    
-                    // We want a high-res output for the avatar
                     const size = 64; 
                     canvas.width = size;
                     canvas.height = size;
 
                     if (ctx) {
-                        // Disable smoothing to keep pixel art crisp
                         ctx.imageSmoothingEnabled = false;
-
-                        // Minecraft Skin Mapping:
-                        // Head Front: x=8, y=8, w=8, h=8
-                        // Hat/Helm Front: x=40, y=8, w=8, h=8
-
-                        // 1. Draw the Face Layer
-                        // drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight)
                         ctx.drawImage(img, 8, 8, 8, 8, 0, 0, size, size);
-
-                        // 2. Draw the Hat/Accessory Layer (Overlay)
                         ctx.drawImage(img, 40, 8, 8, 8, 0, 0, size, size);
-
-                        // Save as Base64
                         const croppedFace = canvas.toDataURL('image/png');
                         setCustomSkin(croppedFace);
                     }
@@ -77,9 +83,15 @@ const Home: React.FC = () => {
         }
     };
 
+    const handleCopyIp = () => {
+        navigator.clipboard.writeText("jasper.lura.host:35570");
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
     return (
         <div className="flex flex-col items-center justify-center min-h-[70vh] w-full px-4">
-            <div className="relative animate-float mb-12">
+            <div className="relative mb-12">
                 <div className="text-center">
                     <h1 className="font-pixel text-5xl md:text-7xl text-white drop-shadow-[0_0_20px_rgba(220,20,60,0.5)]">
                         NOT<br/>
@@ -104,19 +116,55 @@ const Home: React.FC = () => {
                     </button>
                 </div>
             ) : (
-                <div className="flex flex-col sm:flex-row gap-6">
-                    <button 
-                        onClick={() => { setModalMode('register'); setError(''); setCustomSkin(''); }}
-                        className="bg-crimson text-white font-bold py-3 px-8 font-sans uppercase tracking-widest text-sm hover:bg-red-700 hover:scale-105 transition-all shadow-[0_0_15px_rgba(220,20,60,0.4)]"
-                    >
-                        Novo Desafiante
-                    </button>
-                    <button 
-                        onClick={() => { setModalMode('login'); setError(''); }}
-                        className="bg-transparent border-2 border-white text-white font-bold py-3 px-8 font-sans uppercase tracking-widest text-sm hover:bg-white hover:text-black hover:scale-105 transition-all"
-                    >
-                        Login
-                    </button>
+                <div className="flex flex-col items-center gap-10">
+                    <div className="flex flex-col sm:flex-row gap-6">
+                        <button 
+                            onClick={() => { setModalMode('register'); setError(''); setCustomSkin(''); }}
+                            className="bg-crimson text-white font-bold py-3 px-8 font-sans uppercase tracking-widest text-sm hover:bg-red-700 hover:scale-105 transition-all shadow-[0_0_15px_rgba(220,20,60,0.4)]"
+                        >
+                            Novo Desafiante
+                        </button>
+                        <button 
+                            onClick={() => { setModalMode('login'); setError(''); }}
+                            className="bg-transparent border-2 border-white text-white font-bold py-3 px-8 font-sans uppercase tracking-widest text-sm hover:bg-white hover:text-black hover:scale-105 transition-all"
+                        >
+                            Login
+                        </button>
+                    </div>
+                    
+                    {/* Contador de Players - Estilo Glass Pill Moderno com Cópia */}
+                    <div className="flex flex-col items-center gap-3 mt-4">
+                        <div 
+                            onClick={handleCopyIp}
+                            className="relative group cursor-pointer"
+                            title="Clique para copiar o IP"
+                        >
+                            {/* Glow Effect Background */}
+                            {serverStatus.online && (
+                                <div className="absolute -inset-0.5 bg-green-500/20 rounded-full blur opacity-50 group-hover:opacity-100 transition duration-500"></div>
+                            )}
+                            
+                            {/* Main Pill Container */}
+                            <div className="relative flex items-center gap-4 bg-black/60 backdrop-blur-md border border-white/10 px-6 py-2 rounded-full shadow-xl transition-transform active:scale-95 hover:border-white/30">
+                                <div className="flex items-center gap-3">
+                                    <div className="relative flex h-2.5 w-2.5">
+                                        {serverStatus.online && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>}
+                                        <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${serverStatus.online ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)]' : 'bg-red-500'}`}></span>
+                                    </div>
+                                    <div className="h-4 w-[1px] bg-white/10"></div> {/* Separator */}
+                                    <span className="font-sans font-bold text-xs tracking-widest text-gray-200 uppercase min-w-[110px] text-center transition-all">
+                                        {copied ? (
+                                            <span className="text-green-400 animate-pulse">IP COPIADO!</span>
+                                        ) : serverStatus.online ? (
+                                            <span className="drop-shadow-sm">{serverStatus.players} <span className="text-gray-500 text-[10px] ml-1">PLAYERS</span></span>
+                                        ) : (
+                                            <span className="text-red-400">OFFLINE</span>
+                                        )}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
 
