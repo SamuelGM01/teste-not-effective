@@ -1,4 +1,3 @@
-
 import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
@@ -16,7 +15,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // MongoDB Connection
-const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://Corazon_user:gUDEULzHoaWp0PGo@cluster0.u8wxlkg.mongodb.net/cobblemon?retryWrites=true&w=majority&appName=Cluster0";
+const MONGO_URI = "mongodb+srv://Corazon_user:gUDEULzHoaWp0PGo@cluster0.u8wxlkg.mongodb.net/cobblemon?appName=Cluster0";
 
 mongoose.connect(MONGO_URI)
     .then(() => console.log('✅ Conectado ao MongoDB Atlas'))
@@ -212,6 +211,37 @@ app.post('/api/gyms/:tipo/challenge', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+app.post('/api/gyms/:tipo/battle/accept', async (req, res) => {
+    try {
+        const { tipo } = req.params;
+        const { challengerNick, date, time } = req.body;
+        const gym = await Gym.findOne({ tipo });
+        if (!gym) return res.status(404).json({ error: "Ginásio não encontrado" });
+
+        gym.challengers = gym.challengers.filter(c => c !== challengerNick);
+        gym.activeBattle = { id: new mongoose.Types.ObjectId().toHexString(), challengerNick, date, time, status: 'scheduled' };
+        
+        await gym.save();
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/gyms/:tipo/battle/resolve', async (req, res) => {
+    try {
+        const { tipo } = req.params;
+        const { result } = req.body;
+        const gym = await Gym.findOne({ tipo });
+        if (!gym || !gym.activeBattle) return res.status(404).json({ error: "Batalha ativa não encontrada" });
+
+        const battle = { ...gym.activeBattle, status: 'completed', result };
+        gym.history.unshift(battle);
+        gym.activeBattle = null;
+        
+        await gym.save();
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // 3. Tournaments
 app.get('/api/tournaments', async (req, res) => {
     try {
@@ -229,29 +259,24 @@ app.post('/api/tournaments', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// (O resto das rotas de Torneio e Invite continua igual)
 app.post('/api/tournaments/:id/join', async (req, res) => {
     try {
         const { trainerId, nick, customSkin, pokemon, gymType } = req.body;
         const t = await Tournament.findById(req.params.id);
         if (!t) return res.status(404).json({ error: "Torneio não encontrado" });
-
-        if (t.participants.some(p => p.trainerId === trainerId)) {
-            return res.status(400).json({ error: "Já inscrito" });
-        }
-
+        if (t.participants.some(p => p.trainerId === trainerId)) return res.status(400).json({ error: "Já inscrito" });
         t.participants.push({ trainerId, nick, customSkin, pokemon, gymType });
         t.markModified('participants');
         await t.save();
         res.json(t);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
-
 app.post('/api/tournaments/:id/leave', async (req, res) => {
     try {
         const { trainerId } = req.body;
         const t = await Tournament.findById(req.params.id);
         if (!t) return res.status(404).json({ error: "Torneio não encontrado" });
-
         const me = t.participants.find(p => p.trainerId === trainerId);
         if (me && me.partnerId) {
             const partner = t.participants.find(p => p.trainerId === me.partnerId);
@@ -260,35 +285,24 @@ app.post('/api/tournaments/:id/leave', async (req, res) => {
                 partner.partnerNick = undefined;
             }
         }
-
         t.participants = t.participants.filter(p => p.trainerId !== trainerId);
         t.markModified('participants');
         await t.save();
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
-
 app.post('/api/tournaments/:id/start', async (req, res) => {
     try {
         const t = await Tournament.findById(req.params.id);
         if (!t) return res.status(404).json({ error: "Torneio não encontrado" });
-
         const count = t.participants.length;
-        if (count % 2 !== 0) return res.status(400).json({ error: "Número ímpar de jogadores" });
-
+        if (count % 2 !== 0 && t.format === 'monotype') return res.status(400).json({ error: "Número ímpar de jogadores" });
         const shuffled = [...t.participants].sort(() => Math.random() - 0.5);
         const newMatches = [];
-        const generateId = () => Math.random().toString(36).substr(2, 9);
-
+        const generateId = () => new mongoose.Types.ObjectId().toHexString();
         if (t.format === 'monotype') {
             for (let i = 0; i < shuffled.length; i += 2) {
-                newMatches.push({
-                    id: generateId(),
-                    round: 1,
-                    participants: [shuffled[i], shuffled[i+1]],
-                    winners: [],
-                    bans: {}
-                });
+                newMatches.push({ id: generateId(), round: 1, participants: [shuffled[i], shuffled[i+1]], winners: [], bans: {} });
             }
         } else {
             const pairs = [];
@@ -302,19 +316,11 @@ app.post('/api/tournaments/:id/start', async (req, res) => {
                     processedIds.add(partner.trainerId);
                 }
             }
+            if(pairs.length % 2 !== 0) return res.status(400).json({error: "Número ímpar de duplas"});
             for (let i = 0; i < pairs.length; i += 2) {
-                if (i+1 < pairs.length) {
-                    newMatches.push({
-                        id: generateId(),
-                        round: 1,
-                        participants: [...pairs[i], ...pairs[i+1]],
-                        winners: [],
-                        bans: {}
-                    });
-                }
+                newMatches.push({ id: generateId(), round: 1, participants: [...pairs[i], ...pairs[i+1]], winners: [], bans: {} });
             }
         }
-
         t.status = 'active';
         t.currentRound = 1;
         t.matches = newMatches;
@@ -323,31 +329,25 @@ app.post('/api/tournaments/:id/start', async (req, res) => {
         res.json(t);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
-
 app.post('/api/tournaments/:id/matches/:matchId/win', async (req, res) => {
     try {
         const { winners } = req.body;
         const t = await Tournament.findById(req.params.id);
         const match = t.matches.find(m => m.id === req.params.matchId);
         if (!match) return res.status(404).json({ error: "Partida não encontrada" });
-
         match.winners = winners;
-        
         const roundMatches = t.matches.filter(m => m.round === t.currentRound);
         const allFinished = roundMatches.every(m => m.winners && m.winners.length > 0);
-
         if (allFinished) {
             const winnersIds = roundMatches.flatMap(m => m.winners);
             const isOver = t.format === 'monotype' ? winnersIds.length === 1 : winnersIds.length === 2;
-
             if (isOver) {
                 t.status = 'completed';
             } else {
                 t.currentRound += 1;
                 const nextParticipants = t.participants.filter(p => winnersIds.includes(p.trainerId));
                 const shuffled = nextParticipants.sort(() => Math.random() - 0.5);
-                const generateId = () => Math.random().toString(36).substr(2, 9);
-
+                const generateId = () => new mongoose.Types.ObjectId().toHexString();
                 if (t.format === 'monotype') {
                     for (let i = 0; i < shuffled.length; i += 2) {
                         if (i+1 < shuffled.length) {
@@ -378,36 +378,30 @@ app.post('/api/tournaments/:id/matches/:matchId/win', async (req, res) => {
                 }
             }
         }
-
         t.markModified('matches');
         await t.save();
         res.json(t);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
-
 app.post('/api/tournaments/:id/matches/:matchId/ban', async (req, res) => {
     try {
         const { targetTrainerId, pokemonName } = req.body;
         const t = await Tournament.findById(req.params.id);
         const match = t.matches.find(m => m.id === req.params.matchId);
-        
+        if (!match) return res.status(404).json({ error: "Partida não encontrada" });
         if (!match.bans) match.bans = {};
         if (!match.bans[targetTrainerId]) match.bans[targetTrainerId] = [];
-
         const bans = match.bans[targetTrainerId];
         if (bans.includes(pokemonName)) {
             match.bans[targetTrainerId] = bans.filter(n => n !== pokemonName);
         } else {
             match.bans[targetTrainerId].push(pokemonName);
         }
-
         t.markModified('matches');
         await t.save();
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
-
-// 4. Invites
 app.get('/api/invites', async (req, res) => {
     try {
         const { nick } = req.query;
@@ -415,39 +409,32 @@ app.get('/api/invites', async (req, res) => {
         res.json(invites);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
-
 app.post('/api/invites', async (req, res) => {
     try {
         const { tournamentId, tournamentName, fromNick, toNick } = req.body;
         const exists = await Invite.findOne({ tournamentId, fromNick, toNick, status: 'pending' });
         if (exists) return res.status(400).json({ error: "Convite já enviado" });
-
         const invite = new Invite({ tournamentId, tournamentName, fromNick, toNick });
         await invite.save();
         res.json(invite);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
-
 app.post('/api/invites/:id/respond', async (req, res) => {
     try {
         const { accept } = req.body;
         const invite = await Invite.findByIdAndUpdate(req.params.id, { status: accept ? 'accepted' : 'rejected' }, { new: true });
-        
         if (accept && invite) {
             const tournament = await Tournament.findById(invite.tournamentId);
             if (tournament) {
                 const p1Index = tournament.participants.findIndex(p => p.nick === invite.fromNick);
                 const p2Index = tournament.participants.findIndex(p => p.nick === invite.toNick);
-                
                 if (p1Index !== -1 && p2Index !== -1) {
                     const p1 = tournament.participants[p1Index];
                     const p2 = tournament.participants[p2Index];
-                    
                     p1.partnerId = p2.trainerId;
                     p1.partnerNick = p2.nick;
                     p2.partnerId = p1.trainerId;
                     p2.partnerNick = p1.nick;
-                    
                     tournament.markModified('participants');
                     await tournament.save();
                 }
