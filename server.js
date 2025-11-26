@@ -17,12 +17,12 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // MongoDB Connection
-// Connecting to the Cluster0 'cobblemon' database as requested to access previous version info
+// Connecting to Cluster0 as requested to access previous version info
 const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://Corazon_user:gUDEULzHoaWp0PGo@cluster0.u8wxlkg.mongodb.net/cobblemon?retryWrites=true&w=majority&appName=Cluster0";
 
 mongoose.set('strictQuery', false); // Allow flexibility for older schemas
 mongoose.connect(MONGO_URI)
-    .then(() => console.log('✅ Conectado ao MongoDB Atlas (Not Effective Cluster)'))
+    .then(() => console.log('✅ Conectado ao MongoDB Atlas (Cluster0 - Not Effective)'))
     .catch(err => console.error('❌ Erro no MongoDB:', err));
 
 app.use(cors());
@@ -36,7 +36,7 @@ const TrainerSchema = new mongoose.Schema({
     customSkin: String,
     insignias: [String],
     createdAt: { type: Date, default: Date.now }
-}, { collection: 'trainers' }); // Force collection name to ensure we hit existing data
+}, { collection: 'trainers' }); 
 const Trainer = mongoose.model('Trainer', TrainerSchema);
 
 const GymSchema = new mongoose.Schema({
@@ -215,7 +215,7 @@ app.post('/api/gyms/:tipo/challenge', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Battle Routes (Newly Added)
+// Battle Routes
 app.post('/api/gyms/:tipo/battle/accept', async (req, res) => {
     try {
         const { tipo } = req.params;

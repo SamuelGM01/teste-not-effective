@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { GYM_TYPES, Gym, TYPE_COLORS, getTypeIcon, getSkinUrl, GymBattle } from '../types';
 import * as api from '../services/mockBackend';
@@ -425,12 +424,13 @@ const Gyms: React.FC = () => {
         
         const fetchOnlinePlayers = async () => {
             try {
-                // Force fresh fetch with timestamp
-                const response = await fetch(`https://api.mcsrvstat.us/2/jasper.lura.host:35570?t=${Date.now()}`);
+                // Using mcstatus.io as it provides a structured player list object
+                const response = await fetch(`https://api.mcstatus.io/v2/status/java/jasper.lura.host:35570`);
                 const data = await response.json();
-                if (data.online && data.players) {
-                    // Check players.list or fallback to empty array if valid but no names
-                    setOnlinePlayers(data.players.list || []); 
+                if (data.online && data.players && Array.isArray(data.players.list)) {
+                    // Map the player objects to names
+                    const names = data.players.list.map((p: any) => p.name_clean || p.name_raw || p.name);
+                    setOnlinePlayers(names);
                 } else {
                     setOnlinePlayers([]);
                 }
@@ -677,7 +677,7 @@ const Gyms: React.FC = () => {
                             >
                                 <div 
                                     className={`
-                                        relative w-24 h-24 rounded-2xl flex items-center justify-center 
+                                        relative w-24 h-24 rounded-full flex items-center justify-center 
                                         border transition-all duration-300 backdrop-blur-md overflow-hidden
                                         ${isOnline 
                                             ? 'border-green-500/50 shadow-[0_0_20px_rgba(34,197,94,0.3)]' 

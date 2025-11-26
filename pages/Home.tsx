@@ -20,15 +20,13 @@ const Home: React.FC = () => {
     useEffect(() => {
         const fetchServerStatus = async () => {
             try {
-                // Using cache busting and ensuring we get data. 
-                // Using generic jasper.lura.host:35570 might be cached.
-                const response = await fetch(`https://api.mcsrvstat.us/2/jasper.lura.host:35570?t=${Date.now()}`);
+                // Using mcstatus.io for better reliability and detailed player info if needed
+                const response = await fetch(`https://api.mcstatus.io/v2/status/java/jasper.lura.host:35570`);
                 const data = await response.json();
                 
                 if (data.online) {
                     setServerStatus({
                         online: true,
-                        // Fallback: sometimes list is present but online count is missing, or vice versa
                         players: data.players ? (data.players.online || 0) : 0
                     });
                 } else {
