@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import * as api from '../services/mockBackend';
 import { useAuth } from '../contexts/AuthContext';
@@ -141,7 +140,10 @@ const Tournaments: React.FC = () => {
     const sendInvite = async (targetNick: string) => {
         if (!user || !showInviteModal) return;
         try {
-            await api.sendInvite(showInviteModal, user.nick, targetNick);
+            const tournament = tournaments.find(t => t.id === showInviteModal);
+            if (!tournament) return alert("Torneio não encontrado");
+
+            await api.sendInvite(showInviteModal, tournament.name, user.nick, targetNick);
             alert(`Convite enviado para ${targetNick}!`);
             setShowInviteModal(null);
         } catch (error: any) {
