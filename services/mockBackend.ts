@@ -190,26 +190,6 @@ export const resolveBattle = async (tipo: string, result: 'leader_win' | 'challe
     setLS(KEYS.GYMS, gyms);
 };
 
-// --- SERVER STATUS ---
-export const getServerStatus = async (): Promise<{ online: boolean, players: number }> => {
-    try {
-        // This now calls our own backend proxy
-        const response = await fetch('/api/server-status');
-        if (!response.ok) {
-            console.error('Server status API failed:', response.status);
-            return { online: false, players: 0 };
-        }
-        const data = await response.json();
-        return {
-            online: data.online,
-            players: data.players ? data.players.online : 0
-        };
-    } catch (e) {
-        console.error("Error fetching server status:", e);
-        return { online: false, players: 0 };
-    }
-};
-
 // --- TOURNAMENTS ---
 export const getTournaments = async (): Promise<Tournament[]> => {
     await delay(300);
@@ -589,4 +569,22 @@ export const getPokemonDetails = async (url: string) => {
         name: data.name,
         sprite: sprite
     };
+};
+
+// --- EXTERNAL API (SERVER STATUS PROXY) ---
+export const getServerStatus = async () => {
+    try {
+        const response = await fetch('/api/server-status');
+        if (!response.ok) {
+            throw new Error(`Backend proxy failed with status: ${response.status}`);
+        }
+        const data = await response.json();
+        return {
+            online: data.online,
+            players: data.players?.online ?? 0
+        };
+    } catch (err) {
+        console.error("Erro ao buscar status do servidor via proxy", err);
+        return { online: false, players: 0 };
+    }
 };

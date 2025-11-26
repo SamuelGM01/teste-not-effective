@@ -19,7 +19,6 @@ const Home: React.FC = () => {
 
     useEffect(() => {
         const fetchServerStatus = async () => {
-            // Now fetches from our abstracted and proxied service
             const status = await api.getServerStatus();
             setServerStatus(status);
         };

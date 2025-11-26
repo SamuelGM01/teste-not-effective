@@ -5,7 +5,6 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import https from 'https';
 
 dotenv.config();
 
@@ -98,6 +97,24 @@ const initializeGyms = async () => {
 initializeGyms();
 
 // --- API ROUTES ---
+
+// Server Status Proxy
+app.get('/api/server-status', async (req, res) => {
+    try {
+        const response = await fetch(`https://api.mcstatus.io/v2/status/java/jasper.lura.host:35570?_=${new Date().getTime()}`);
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error("mcstatus.io API error:", errorText);
+            return res.status(response.status).json({ online: false, players: { online: 0 }, error: "Failed to fetch from mcstatus.io" });
+        }
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        console.error("Proxy error for /api/server-status:", error);
+        res.status(500).json({ online: false, players: { online: 0 }, error: "Internal server error" });
+    }
+});
+
 
 // 1. Trainers
 app.get('/api/trainers', async (req, res) => {
@@ -211,43 +228,6 @@ app.post('/api/gyms/:tipo/challenge', async (req, res) => {
         await gym.save();
         res.json({ success: true, challengers: gym.challengers });
     } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// New route for server status proxy
-app.get('/api/server-status', (req, res) => {
-    const options = {
-        hostname: 'api.mcstatus.io',
-        port: 443,
-        path: '/v2/status/java/jasper.lura.host:35570',
-        method: 'GET',
-        headers: { 'User-Agent': 'Node.js-Server-Proxy' }
-    };
-
-    const apiReq = https.request(options, apiRes => {
-        let data = '';
-        apiRes.on('data', chunk => {
-            data += chunk;
-        });
-        apiRes.on('end', () => {
-            if (apiRes.statusCode >= 200 && apiRes.statusCode < 300) {
-                try {
-                    const jsonData = JSON.parse(data);
-                    res.json(jsonData);
-                } catch (e) {
-                    res.status(500).json({ online: false, players: { online: 0 } });
-                }
-            } else {
-                 res.status(apiRes.statusCode).json({ online: false, players: { online: 0 } });
-            }
-        });
-    });
-
-    apiReq.on('error', error => {
-        console.error('Error fetching server status:', error);
-        res.status(500).json({ online: false, players: { online: 0 } });
-    });
-
-    apiReq.end();
 });
 
 // 3. Tournaments

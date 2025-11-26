@@ -19,8 +19,7 @@
     "cors": "^2.8.5",
     "url": "^0.11.4",
     "dotenv": "^17.2.3",
-    "express": "^5.1.0",
-    "https": "^1.0.0"
+    "express": "^5.1.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
