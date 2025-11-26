@@ -28,14 +28,19 @@ const InviteListener: React.FC = () => {
 
     const checkInvites = async () => {
         if (!user) return;
-        const pending = await api.getInvites(user.nick);
-        // We only update if length changes to avoid unnecessary re-renders causing UI flickers
-        setInvites(prev => {
-            if (JSON.stringify(prev) !== JSON.stringify(pending)) {
-                return pending;
-            }
-            return prev;
-        });
+        try {
+            const pending = await api.getInvites(user.nick);
+            // We only update if length changes to avoid unnecessary re-renders causing UI flickers
+            setInvites(prev => {
+                if (JSON.stringify(prev) !== JSON.stringify(pending)) {
+                    return pending;
+                }
+                return prev;
+            });
+        } catch (error) {
+            console.error("Failed to check for invites:", error);
+            setInvites([]); // Clear invites on error
+        }
     };
 
     const handleRespond = async (inviteId: string, accept: boolean) => {

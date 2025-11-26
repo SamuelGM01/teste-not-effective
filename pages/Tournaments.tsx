@@ -43,17 +43,21 @@ const Tournaments: React.FC = () => {
     }, []);
 
     const loadTournaments = async () => {
-        const data = await api.getTournaments();
-        data.sort((a, b) => b.createdAt - a.createdAt);
-        setTournaments(data);
-        if (selectedTournament) {
-            const fresh = data.find(t => t.id === selectedTournament.id);
-            if (fresh) setSelectedTournament(fresh);
-        }
-        if (selectedMatch && selectedTournament) {
-            const freshT = data.find(t => t.id === selectedTournament.id);
-            const freshM = freshT?.matches.find(m => m.id === selectedMatch.id);
-            if (freshM) setSelectedMatch(freshM);
+        try {
+            const data = await api.getTournaments();
+            data.sort((a, b) => b.createdAt - a.createdAt);
+            setTournaments(data);
+            if (selectedTournament) {
+                const fresh = data.find(t => t.id === selectedTournament.id);
+                if (fresh) setSelectedTournament(fresh);
+            }
+            if (selectedMatch && selectedTournament) {
+                const freshT = data.find(t => t.id === selectedTournament.id);
+                const freshM = freshT?.matches.find(m => m.id === selectedMatch.id);
+                if (freshM) setSelectedMatch(freshM);
+            }
+        } catch (error) {
+            console.error("Failed to load tournaments:", error);
         }
     };
 
@@ -141,7 +145,10 @@ const Tournaments: React.FC = () => {
     const sendInvite = async (targetNick: string) => {
         if (!user || !showInviteModal) return;
         try {
-            await api.sendInvite(showInviteModal, user.nick, targetNick);
+            const tournament = tournaments.find(t => t.id === showInviteModal);
+            if (!tournament) return alert("Torneio não encontrado");
+
+            await api.sendInvite(showInviteModal, tournament.name, user.nick, targetNick);
             alert(`Convite enviado para ${targetNick}!`);
             setShowInviteModal(null);
         } catch (error: any) {
