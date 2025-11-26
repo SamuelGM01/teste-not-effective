@@ -70,7 +70,7 @@ const Invite = mongoose.model('Invite', InviteSchema);
 // --- INITIALIZATION ---
 const GYM_TYPES = [
     "agua", "dragao", "eletrico", "fada", "fantasma", "fogo", 
-    "gelo", "inseto", "lutador", "metalico", "normal", "pedra", 
+    "gelo", "inseto", "lutador", "metal", "normal", "pedra", 
     "planta", "psiquico", "sombrio", "terra", "venenoso", "voador"
 ];
 
@@ -463,7 +463,7 @@ app.use(express.static(__dirname));
 
 // The "catchall" handler: for any request that doesn't match one of the API routes above,
 // send back React's index.html file. This is required for single-page applications.
-app.get('*', (req, res) => {
+app.get('/*', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
