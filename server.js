@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+// 1. Configurações Iniciais
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
@@ -12,14 +13,10 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// MongoDB Connection - Updated to the specific Cluster0 URI
-const MONGO_URI=mongodb+srv://Corazon_user:gUDEULzHoaWp0PGo@cluster0.u8wxlkg.mongodb.net/?appName=Cluster0
+// Middleware para JSON e limites
+app.use(express.json({ limit: '10mb' }));
 
-mongoose.connect(MONGO_URI)
-    .then(() => console.log('✅ Conectado ao MongoDB Atlas (Cluster0)'))
-    .catch(err => console.error('❌ Erro no MongoDB:', err));
-
-// CORS middleware manual para permitir conexões
+// Middleware de CORS (Permite conexão do frontend)
 app.use((req, res, next) => {
     res.header("Access-Control-Allow-Origin", "*");
     res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
@@ -30,13 +27,11 @@ app.use((req, res, next) => {
     next();
 });
 
-app.use(express.json({ limit: '10mb' }));
-
-// --- SCHEMAS ---
+// --- SCHEMAS (Modelos do Banco) ---
 
 const TrainerSchema = new mongoose.Schema({
     nick: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
+    password: { type: String, required: true }, // Em produção, use hash (bcrypt)!
     customSkin: String,
     insignias: [String],
     createdAt: { type: Date, default: Date.now }
@@ -54,6 +49,7 @@ const GymSchema = new mongoose.Schema({
 });
 const Gym = mongoose.model('Gym', GymSchema);
 
+// Schemas adicionais (mantidos para integridade)
 const TournamentSchema = new mongoose.Schema({
     name: String,
     format: String,
@@ -74,37 +70,57 @@ const InviteSchema = new mongoose.Schema({
 });
 const Invite = mongoose.model('Invite', InviteSchema);
 
-// --- INITIALIZATION ---
+// --- FUNÇÕES DE INICIALIZAÇÃO ---
+
 const GYM_TYPES = [
     "agua", "dragao", "eletrico", "fada", "fantasma", "fogo", 
     "gelo", "inseto", "lutador", "metalico", "normal", "pedra", 
     "planta", "psiquico", "sombrio", "terra", "venenoso", "voador"
 ];
 
+// Função para criar os ginásios se eles não existirem
 const initializeGyms = async () => {
     try {
         const count = await Gym.countDocuments();
         if (count === 0) {
-            console.log("⚙️ Criando ginásios...");
-            for (const tipo of GYM_TYPES) {
-                await Gym.create({
-                    tipo,
-                    lider: "",
-                    time: [null, null, null, null, null, null],
-                    challengers: [],
-                    activeBattle: null,
-                    history: []
-                });
-            }
+            console.log("⚙️  Banco vazio detectado. Criando 18 ginásios...");
+            const gymsToCreate = GYM_TYPES.map(tipo => ({
+                tipo,
+                lider: "",
+                time: [null, null, null, null, null, null],
+                challengers: [],
+                activeBattle: null,
+                history: []
+            }));
+            
+            await Gym.insertMany(gymsToCreate);
+            console.log("✅ Ginásios criados com sucesso!");
+        } else {
+            console.log(`ℹ️  ${count} ginásios já encontrados no banco.`);
         }
     } catch (error) {
-        console.error("Erro ao inicializar ginásios:", error);
+        console.error("❌ Erro fatal ao inicializar ginásios:", error);
+        throw error; // Repassa o erro para parar o servidor se falhar
     }
 };
-initializeGyms();
 
-// --- API ROUTES ---
+// --- ROTAS DA API ---
 
+// Rota de Login
+app.post('/api/login', async (req, res) => {
+    try {
+        const { nick, password } = req.body;
+        // Regex para buscar case-insensitive (ignora maiúsculas/minúsculas)
+        const trainer = await Trainer.findOne({ nick: { $regex: new RegExp(`^${nick}$`, 'i') } });
+        
+        if (!trainer) return res.status(404).json({ error: "Usuário não encontrado" });
+        if (trainer.password !== password) return res.status(401).json({ error: "Senha incorreta" });
+        
+        res.json(trainer);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Rotas de Treinadores
 app.get('/api/trainers', async (req, res) => {
     try {
         const trainers = await Trainer.find();
@@ -124,16 +140,6 @@ app.post('/api/trainers', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/login', async (req, res) => {
-    try {
-        const { nick, password } = req.body;
-        const trainer = await Trainer.findOne({ nick: { $regex: new RegExp(`^${nick}$`, 'i') } });
-        if (!trainer) return res.status(404).json({ error: "Usuário não encontrado" });
-        if (trainer.password !== password) return res.status(401).json({ error: "Senha incorreta" });
-        res.json(trainer);
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
 app.delete('/api/trainers/:id', async (req, res) => {
     try {
         await Trainer.findByIdAndDelete(req.params.id);
@@ -141,12 +147,14 @@ app.delete('/api/trainers/:id', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Rotas de Insígnias
 app.post('/api/insignias', async (req, res) => {
     try {
         const { trainerId, badgeId } = req.body;
         const trainer = await Trainer.findById(trainerId);
         if (!trainer) return res.status(404).json({ error: "Trainer not found" });
 
+        // Lógica de toggle (adicionar ou remover)
         if (trainer.insignias.includes(badgeId)) {
             trainer.insignias = trainer.insignias.filter(b => b !== badgeId);
         } else {
@@ -157,8 +165,51 @@ app.post('/api/insignias', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Rotas de Ginásios (Corrigida e completada)
 app.get('/api/gyms', async (req, res) => {
     try {
         const gyms = await Gym.find();
+        
+        // Transforma o array em um objeto onde a chave é o tipo do ginásio
+        // Isso facilita para o frontend acessar: gyms['fogo'], gyms['agua']
         const gymMap = {};
         gyms.forEach(g => gymMap[g.tipo] = g);
+        
+        res.json(gymMap);
+    } catch (e) { 
+        console.error(e);
+        res.status(500).json({ error: e.message }); 
+    }
+});
+
+// --- INICIALIZAÇÃO DO SERVIDOR ---
+
+const startServer = async () => {
+    try {
+        const mongoUri = process.env.MONGO_URI;
+        if (!mongoUri) {
+            throw new Error("MONGO_URI não definida no arquivo .env");
+        }
+
+        // 1. Conecta ao MongoDB Atlas
+        console.log("⏳ Conectando ao MongoDB Cluster0...");
+        await mongoose.connect(mongoUri);
+        console.log("✅ Conectado ao MongoDB Atlas (Cluster0)");
+
+        // 2. Inicializa os dados (Cache/Ginásios)
+        await initializeGyms();
+
+        // 3. Abre a porta do servidor
+        app.listen(PORT, () => {
+            console.log(`🚀 Servidor Cobblemon rodando na porta ${PORT}`);
+            console.log(`📡 Acesse em: http://localhost:${PORT}`);
+        });
+
+    } catch (error) {
+        console.error("❌ Falha ao iniciar o servidor:", error);
+        process.exit(1); // Encerra o processo com erro
+    }
+};
+
+// Executa a inicialização
+startServer();
