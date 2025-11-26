@@ -1,3 +1,4 @@
+
 import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
@@ -210,51 +211,6 @@ app.post('/api/gyms/:tipo/challenge', async (req, res) => {
         res.json({ success: true, challengers: gym.challengers });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
-
-app.post('/api/gyms/:tipo/accept-challenge', async (req, res) => {
-    try {
-        const { tipo } = req.params;
-        const { challengerNick, date, time } = req.body;
-        const gym = await Gym.findOne({ tipo });
-        if (!gym) return res.status(404).json({ error: "Ginásio não encontrado" });
-
-        if (gym.challengers) {
-            gym.challengers = gym.challengers.filter(c => c !== challengerNick);
-        }
-
-        gym.activeBattle = {
-            id: new mongoose.Types.ObjectId().toHexString(),
-            challengerNick,
-            date,
-            time,
-            status: 'scheduled'
-        };
-
-        await gym.save();
-        res.json({ success: true });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/gyms/:tipo/resolve-battle', async (req, res) => {
-    try {
-        const { tipo } = req.params;
-        const { result } = req.body;
-        const gym = await Gym.findOne({ tipo });
-        if (!gym || !gym.activeBattle) return res.status(404).json({ error: "Batalha ativa não encontrada" });
-
-        const battle = gym.activeBattle;
-        battle.status = 'completed';
-        battle.result = result;
-
-        if (!gym.history) gym.history = [];
-        gym.history.unshift(battle);
-        gym.activeBattle = null;
-
-        await gym.save();
-        res.json({ success: true });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
 
 // 3. Tournaments
 app.get('/api/tournaments', async (req, res) => {
