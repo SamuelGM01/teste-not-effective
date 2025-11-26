@@ -70,7 +70,7 @@ const Invite = mongoose.model('Invite', InviteSchema);
 // --- INITIALIZATION ---
 const GYM_TYPES = [
     "agua", "dragao", "eletrico", "fada", "fantasma", "fogo", 
-    "gelo", "inseto", "lutador", "metal", "normal", "pedra", 
+    "gelo", "inseto", "lutador", "metalico", "normal", "pedra", 
     "planta", "psiquico", "sombrio", "terra", "venenoso", "voador"
 ];
 
@@ -458,15 +458,11 @@ app.post('/api/invites/:id/respond', async (req, res) => {
 });
 
 // --- SERVE REACT FRONTEND ---
-// Serve static files from the root directory which contains index.html and other assets.
-app.use(express.static(__dirname));
+app.use(express.static(path.join(__dirname, 'dist')));
 
-// The "catchall" handler: for any request that doesn't match one of the API routes above,
-// send back React's index.html file. This is required for single-page applications.
-app.get('/*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+app.get(/.*/, (req, res) => {
+    res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
-
 
 app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
