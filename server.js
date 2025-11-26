@@ -533,9 +533,9 @@ app.post('/api/invites/:id/respond', async (req, res) => {
 });
 
 // --- API FALLBACK HANDLER (CRITICAL FIX) ---
-// Se alguma rota /api/* for chamada e não existir acima, retorne JSON 404.
-// Isso impede que o servidor tente buscar um arquivo HTML (fallthrough) e cause "File not found" com erro de parse no frontend.
-app.all('/api/*', (req, res) => {
+// Substituída a rota curinga /api/* por um middleware simples que verifica o prefixo.
+// Isso evita o erro de sintaxe do path-to-regexp no Render.
+app.use('/api', (req, res) => {
     res.status(404).json({ error: `API endpoint not found: ${req.method} ${req.originalUrl}` });
 });
 
