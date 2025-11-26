@@ -14,13 +14,9 @@ const Trainers: React.FC = () => {
     }, []);
 
     const loadTrainers = async () => {
-        try {
-            const data = await api.getTrainers();
-            data.sort((a, b) => a.nick.localeCompare(b.nick));
-            setTrainers(data);
-        } catch (error) {
-            console.error("Failed to load trainers:", error);
-        }
+        const data = await api.getTrainers();
+        data.sort((a, b) => a.nick.localeCompare(b.nick));
+        setTrainers(data);
     };
 
     const handleDeleteTrainer = async (id: string) => {

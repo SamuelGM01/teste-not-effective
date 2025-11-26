@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import * as api from '../services/mockBackend';
 import { useAuth } from '../contexts/AuthContext';
@@ -19,11 +20,7 @@ const Home: React.FC = () => {
     useEffect(() => {
         const fetchServerStatus = async () => {
             try {
-                // Switched to a more reliable API endpoint
-                const response = await fetch(`https://api.mcstatus.io/v2/status/java/jasper.lura.host:35570?_=${new Date().getTime()}`);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
+                const response = await fetch('https://api.mcsrvstat.us/2/jasper.lura.host:35570');
                 const data = await response.json();
                 setServerStatus({
                     online: data.online,
@@ -31,7 +28,6 @@ const Home: React.FC = () => {
                 });
             } catch (err) {
                 console.error("Erro ao buscar status do servidor", err);
-                setServerStatus({ online: false, players: 0 });
             }
         };
 
@@ -138,32 +134,35 @@ const Home: React.FC = () => {
                 </div>
             )}
 
-            {/* Contador de Players - Redesigned */}
+            {/* Contador de Players - Exibido Sempre (Logado ou Não) */}
             <div className="flex flex-col items-center gap-3">
                 <div 
                     onClick={handleCopyIp}
-                    className="group cursor-pointer"
+                    className="relative group cursor-pointer"
                     title="Clique para copiar o IP"
                 >
-                    <div className={`relative flex items-center gap-2.5 bg-darker border border-neutral-800 px-4 py-2 rounded-full shadow-lg transition-all hover:border-neutral-600 active:scale-95 ${serverStatus.online ? 'shadow-[0_0_15px_rgba(34,197,94,0.4)]' : ''}`}>
-                        {/* Status Dot */}
-                        <div className={`w-3 h-3 rounded-full ${serverStatus.online ? 'bg-green-400 shadow-[0_0_8px_rgba(34,197,94,0.8)]' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]'}`}></div>
-                        
-                        {/* Separator */}
-                        <div className="h-4 w-px bg-neutral-700"></div>
-
-                        {/* Text Content */}
-                        <div className="flex items-center gap-2.5 min-w-[100px] justify-center">
-                            {copied ? (
-                                <span className="font-pixel text-xs text-green-400 animate-pulse">IP COPIADO!</span>
-                            ) : serverStatus.online ? (
-                                <>
-                                    <span className="font-sans font-bold text-base text-white">{serverStatus.players}</span>
-                                    <span className="font-sans font-semibold text-xs text-gray-500 tracking-wider">PLAYERS</span>
-                                </>
-                            ) : (
-                                <span className="font-sans font-semibold tracking-wider text-red-500">OFFLINE</span>
-                            )}
+                    {/* Glow Effect Background */}
+                    {serverStatus.online && (
+                        <div className="absolute -inset-0.5 bg-green-500/20 rounded-full blur opacity-50 group-hover:opacity-100 transition duration-500"></div>
+                    )}
+                    
+                    {/* Main Pill Container */}
+                    <div className="relative flex items-center gap-4 bg-black/60 backdrop-blur-md border border-white/10 px-6 py-2 rounded-full shadow-xl transition-transform active:scale-95 hover:border-white/30">
+                        <div className="flex items-center gap-3">
+                            <div className="relative flex h-2.5 w-2.5">
+                                {serverStatus.online && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>}
+                                <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${serverStatus.online ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)]' : 'bg-red-500'}`}></span>
+                            </div>
+                            <div className="h-4 w-[1px] bg-white/10"></div> {/* Separator */}
+                            <span className="font-sans font-bold text-xs tracking-widest text-gray-200 uppercase min-w-[110px] text-center transition-all">
+                                {copied ? (
+                                    <span className="text-green-400 animate-pulse">IP COPIADO!</span>
+                                ) : serverStatus.online ? (
+                                    <span className="drop-shadow-sm">{serverStatus.players} <span className="text-gray-500 text-[10px] ml-1">PLAYERS</span></span>
+                                ) : (
+                                    <span className="text-red-400">OFFLINE</span>
+                                )}
+                            </span>
                         </div>
                     </div>
                 </div>

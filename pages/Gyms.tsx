@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { GYM_TYPES, Gym, TYPE_COLORS, getTypeIcon, getSkinUrl, GymBattle } from '../types';
 import * as api from '../services/mockBackend';
@@ -236,7 +235,7 @@ const GymBackgroundEffect: React.FC<{ type: string }> = ({ type }) => {
                 </div>
             );
 
-        case 'metal': 
+        case 'metalico': 
             return (
                 <div className="absolute inset-0 overflow-hidden pointer-events-none">
                     <div className="absolute inset-0 bg-slate-800/20" />
@@ -425,21 +424,15 @@ const Gyms: React.FC = () => {
         
         const fetchOnlinePlayers = async () => {
             try {
-                // Switched to a more reliable API and adjusted parsing
-                const response = await fetch(`https://api.mcstatus.io/v2/status/java/jasper.lura.host:35570?_=${new Date().getTime()}`);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
+                const response = await fetch('https://api.mcsrvstat.us/2/jasper.lura.host:35570');
                 const data = await response.json();
-                if (data.players && data.players.list && Array.isArray(data.players.list)) {
-                    // The new API returns a list of objects, we need to map the names
-                    setOnlinePlayers(data.players.list.map((p: any) => p.name_raw));
+                if (data.players && data.players.list) {
+                    setOnlinePlayers(data.players.list); // Array of strings (nicks)
                 } else {
                     setOnlinePlayers([]);
                 }
             } catch (e) {
                 console.error("Failed to fetch online players", e);
-                setOnlinePlayers([]);
             }
         };
 
@@ -677,45 +670,36 @@ const Gyms: React.FC = () => {
                             <div 
                                 key={tipo}
                                 onClick={() => handleOpenGym(tipo)}
-                                className="group cursor-pointer flex flex-col items-center gap-3"
+                                className="group cursor-pointer flex flex-col items-center gap-2 transition-transform hover:scale-110"
                             >
+                                {/* 
+                                    Circular Gym Icon with explicit shadow border for Online status.
+                                    REMOVED animate-pulse-glow which was causing image blur.
+                                    Replaced with explicit box-shadow logic that applies strictly to the container border.
+                                */}
                                 <div 
                                     className={`
-                                        relative w-24 h-24 rounded-full flex items-center justify-center 
-                                        transition-all duration-300 backdrop-blur-md overflow-hidden
+                                        w-20 h-20 rounded-full flex items-center justify-center border-4 transition-all overflow-hidden relative
                                         ${isOnline 
-                                            ? 'border-2 border-green-500 shadow-[0_0_20px_rgba(34,197,94,0.4)]' 
-                                            : 'border border-white/10 shadow-black/50 hover:border-white/30 hover:shadow-[0_0_15px_rgba(255,255,255,0.1)]'
+                                            ? 'border-green-500 shadow-[0_0_15px_rgba(34,197,94,0.8)]' // Stronger shadow, NO opacity animation on container
+                                            : 'border-neutral-800 shadow-lg group-hover:border-white'
                                         }
                                     `}
-                                    style={{ 
-                                        background: `linear-gradient(135deg, ${TYPE_COLORS[tipo]}33 0%, ${TYPE_COLORS[tipo]}05 100%)`,
-                                    }}
+                                    style={{ backgroundColor: TYPE_COLORS[tipo] || '#333' }}
                                 >
-                                    {/* Inner Glow on Hover */}
-                                    <div 
-                                        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-                                        style={{
-                                            background: `radial-gradient(circle at center, ${TYPE_COLORS[tipo]}40 0%, transparent 70%)`
-                                        }}
-                                    />
-
                                     <img 
                                         src={getTypeIcon(tipo)} 
                                         alt={tipo}
-                                        className="w-12 h-12 object-contain brightness-0 invert opacity-90 drop-shadow-md z-10 transition-transform group-hover:scale-110 duration-300"
-                                        style={{ filter: 'drop-shadow(0 0 5px rgba(0,0,0,0.5))' }}
+                                        className="w-12 h-12 object-contain brightness-0 invert opacity-90 drop-shadow-sm"
+                                        style={{ filter: 'none' }} // Force no filter on image
                                     />
                                 </div>
-                                
-                                <div className="flex flex-col items-center text-center h-10">
-                                    <span className="text-xs font-pixel uppercase tracking-wider text-gray-400 transition-colors duration-300">
+                                <div className="flex flex-col items-center">
+                                    <span className="text-xs text-gray-500 font-pixel uppercase group-hover:text-crimson transition-colors">
                                         {tipo}
                                     </span>
                                     {isOnline && (
-                                        <span className="text-[9px] font-pixel uppercase text-green-400 mt-1" style={{ textShadow: '0 0 8px rgba(74, 222, 128, 0.5)' }}>
-                                            ONLINE
-                                        </span>
+                                        <span className="text-[8px] text-green-400 font-sans font-bold tracking-wider mt-1 drop-shadow-[0_0_5px_rgba(34,197,94,0.5)]">ONLINE</span>
                                     )}
                                 </div>
                             </div>

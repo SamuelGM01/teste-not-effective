@@ -1,5 +1,7 @@
+
 import express from 'express';
 import mongoose from 'mongoose';
+import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -13,28 +15,15 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// MongoDB Connection for local development
-const MONGO_URI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/cobblemon";
+// MongoDB Connection
+const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://Corazon_user:gUDEULzHoaWp0PGo@cluster0.u8wxlkg.mongodb.net/cobblemon?retryWrites=true&w=majority&appName=Cluster0";
 
 mongoose.connect(MONGO_URI)
-    .then(() => console.log('✅ Conectado ao MongoDB'))
+    .then(() => console.log('✅ Conectado ao MongoDB Atlas'))
     .catch(err => console.error('❌ Erro no MongoDB:', err));
 
+app.use(cors());
 app.use(express.json({ limit: '10mb' })); // Replaces body-parser
-
-// Manual CORS Middleware to replace the `cors` package
-app.use((req, res, next) => {
-    res.setHeader('Access-Control-Allow-Origin', '*'); // Allow any origin
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, PUT, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
-    // Handle preflight requests for non-simple methods
-    if (req.method === 'OPTIONS') {
-        return res.sendStatus(200);
-    }
-
-    next();
-});
 
 // --- SCHEMAS ---
 
@@ -81,7 +70,7 @@ const Invite = mongoose.model('Invite', InviteSchema);
 // --- INITIALIZATION ---
 const GYM_TYPES = [
     "agua", "dragao", "eletrico", "fada", "fantasma", "fogo", 
-    "gelo", "inseto", "lutador", "metal", "normal", "pedra", 
+    "gelo", "inseto", "lutador", "metalico", "normal", "pedra", 
     "planta", "psiquico", "sombrio", "terra", "venenoso", "voador"
 ];
 
@@ -222,51 +211,6 @@ app.post('/api/gyms/:tipo/challenge', async (req, res) => {
         res.json({ success: true, challengers: gym.challengers });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
-
-app.post('/api/gyms/:tipo/accept-challenge', async (req, res) => {
-    try {
-        const { tipo } = req.params;
-        const { challengerNick, date, time } = req.body;
-        const gym = await Gym.findOne({ tipo });
-        if (!gym) return res.status(404).json({ error: "Ginásio não encontrado" });
-
-        if (gym.challengers) {
-            gym.challengers = gym.challengers.filter(c => c !== challengerNick);
-        }
-
-        gym.activeBattle = {
-            id: new mongoose.Types.ObjectId().toHexString(),
-            challengerNick,
-            date,
-            time,
-            status: 'scheduled'
-        };
-
-        await gym.save();
-        res.json({ success: true });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/gyms/:tipo/resolve-battle', async (req, res) => {
-    try {
-        const { tipo } = req.params;
-        const { result } = req.body;
-        const gym = await Gym.findOne({ tipo });
-        if (!gym || !gym.activeBattle) return res.status(404).json({ error: "Batalha ativa não encontrada" });
-
-        const battle = gym.activeBattle;
-        battle.status = 'completed';
-        battle.result = result;
-
-        if (!gym.history) gym.history = [];
-        gym.history.unshift(battle);
-        gym.activeBattle = null;
-
-        await gym.save();
-        res.json({ success: true });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
 
 // 3. Tournaments
 app.get('/api/tournaments', async (req, res) => {
@@ -514,16 +458,11 @@ app.post('/api/invites/:id/respond', async (req, res) => {
 });
 
 // --- SERVE REACT FRONTEND ---
-// Serve static files from the root directory which contains index.html and other assets.
-app.use(express.static(__dirname));
+app.use(express.static(path.join(__dirname, 'dist')));
 
-// The "catchall" handler: for any request that doesn't match one of the API routes above,
-// send back React's index.html file. This is required for single-page applications.
-// Using a regex to avoid path-to-regexp parsing issues with '*' in some environments.
 app.get(/.*/, (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+    res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
-
 
 app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
