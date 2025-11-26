@@ -425,10 +425,12 @@ const Gyms: React.FC = () => {
         
         const fetchOnlinePlayers = async () => {
             try {
-                const response = await fetch('https://api.mcsrvstat.us/2/jasper.lura.host:35570');
+                // Force fresh fetch with timestamp
+                const response = await fetch(`https://api.mcsrvstat.us/2/jasper.lura.host:35570?t=${Date.now()}`);
                 const data = await response.json();
-                if (data.players && data.players.list) {
-                    setOnlinePlayers(data.players.list); // Array of strings (nicks)
+                if (data.online && data.players) {
+                    // Check players.list or fallback to empty array if valid but no names
+                    setOnlinePlayers(data.players.list || []); 
                 } else {
                     setOnlinePlayers([]);
                 }

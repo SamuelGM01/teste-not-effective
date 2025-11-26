@@ -5,6 +5,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { v4 as uuidv4 } from 'uuid';
 
 dotenv.config();
 
@@ -16,14 +17,16 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // MongoDB Connection
+// Connecting to the Cluster0 'cobblemon' database as requested to access previous version info
 const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://Corazon_user:gUDEULzHoaWp0PGo@cluster0.u8wxlkg.mongodb.net/cobblemon?retryWrites=true&w=majority&appName=Cluster0";
 
+mongoose.set('strictQuery', false); // Allow flexibility for older schemas
 mongoose.connect(MONGO_URI)
-    .then(() => console.log('✅ Conectado ao MongoDB Atlas'))
+    .then(() => console.log('✅ Conectado ao MongoDB Atlas (Not Effective Cluster)'))
     .catch(err => console.error('❌ Erro no MongoDB:', err));
 
 app.use(cors());
-app.use(express.json({ limit: '10mb' })); // Replaces body-parser
+app.use(express.json({ limit: '10mb' })); 
 
 // --- SCHEMAS ---
 
@@ -33,7 +36,7 @@ const TrainerSchema = new mongoose.Schema({
     customSkin: String,
     insignias: [String],
     createdAt: { type: Date, default: Date.now }
-});
+}, { collection: 'trainers' }); // Force collection name to ensure we hit existing data
 const Trainer = mongoose.model('Trainer', TrainerSchema);
 
 const GymSchema = new mongoose.Schema({
@@ -44,7 +47,7 @@ const GymSchema = new mongoose.Schema({
     challengers: [String],
     activeBattle: Object, // GymBattle { id, challengerNick, date, time, status, result }
     history: [Object] // Array of GymBattle
-});
+}, { collection: 'gyms' });
 const Gym = mongoose.model('Gym', GymSchema);
 
 const TournamentSchema = new mongoose.Schema({
@@ -55,7 +58,7 @@ const TournamentSchema = new mongoose.Schema({
     matches: [Object],
     currentRound: { type: Number, default: 0 },
     createdAt: { type: Number, default: Date.now }
-});
+}, { collection: 'tournaments' });
 const Tournament = mongoose.model('Tournament', TournamentSchema);
 
 const InviteSchema = new mongoose.Schema({
@@ -64,7 +67,7 @@ const InviteSchema = new mongoose.Schema({
     fromNick: String,
     toNick: String,
     status: { type: String, default: 'pending' }
-});
+}, { collection: 'invites' });
 const Invite = mongoose.model('Invite', InviteSchema);
 
 // --- INITIALIZATION ---
@@ -78,7 +81,7 @@ const initializeGyms = async () => {
     try {
         const count = await Gym.countDocuments();
         if (count === 0) {
-            console.log("⚙️ Criando ginásios...");
+            console.log("⚙️ Criando ginásios (Initial Setup)...");
             for (const tipo of GYM_TYPES) {
                 await Gym.create({
                     tipo,
@@ -212,6 +215,52 @@ app.post('/api/gyms/:tipo/challenge', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Battle Routes (Newly Added)
+app.post('/api/gyms/:tipo/battle/accept', async (req, res) => {
+    try {
+        const { tipo } = req.params;
+        const { challengerNick, date, time } = req.body;
+        const gym = await Gym.findOne({ tipo });
+        if (!gym) return res.status(404).json({ error: "Ginásio não encontrado" });
+
+        if (gym.challengers) {
+            gym.challengers = gym.challengers.filter(c => c !== challengerNick);
+        }
+
+        gym.activeBattle = {
+            id: uuidv4(),
+            challengerNick,
+            date,
+            time,
+            status: 'scheduled'
+        };
+
+        await gym.save();
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/gyms/:tipo/battle/resolve', async (req, res) => {
+    try {
+        const { tipo } = req.params;
+        const { result } = req.body; // 'leader_win' | 'challenger_win'
+        const gym = await Gym.findOne({ tipo });
+        if (!gym || !gym.activeBattle) return res.status(400).json({ error: "Nenhuma batalha ativa" });
+
+        const battle = gym.activeBattle;
+        battle.status = 'completed';
+        battle.result = result;
+
+        if (!gym.history) gym.history = [];
+        gym.history.unshift(battle);
+        gym.activeBattle = null;
+
+        await gym.save();
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+
 // 3. Tournaments
 app.get('/api/tournaments', async (req, res) => {
     try {
@@ -278,7 +327,7 @@ app.post('/api/tournaments/:id/start', async (req, res) => {
 
         const shuffled = [...t.participants].sort(() => Math.random() - 0.5);
         const newMatches = [];
-        const generateId = () => Math.random().toString(36).substr(2, 9);
+        const generateId = () => uuidv4();
 
         if (t.format === 'monotype') {
             for (let i = 0; i < shuffled.length; i += 2) {
@@ -346,7 +395,7 @@ app.post('/api/tournaments/:id/matches/:matchId/win', async (req, res) => {
                 t.currentRound += 1;
                 const nextParticipants = t.participants.filter(p => winnersIds.includes(p.trainerId));
                 const shuffled = nextParticipants.sort(() => Math.random() - 0.5);
-                const generateId = () => Math.random().toString(36).substr(2, 9);
+                const generateId = () => uuidv4();
 
                 if (t.format === 'monotype') {
                     for (let i = 0; i < shuffled.length; i += 2) {
@@ -465,5 +514,5 @@ app.get(/.*/, (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`🚀 Server running on port ${PORT} connected to MongoDB`);
 });
