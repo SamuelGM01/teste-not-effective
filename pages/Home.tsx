@@ -104,7 +104,7 @@ const Home: React.FC = () => {
             </div>
 
             {user ? (
-                <div className="flex flex-col items-center gap-4">
+                <div className="flex flex-col items-center gap-4 mb-8">
                     <p className="text-white font-pixel text-sm">
                         Bem-vindo, <span className="text-crimson">{user.nick}</span>!
                     </p>
@@ -116,7 +116,7 @@ const Home: React.FC = () => {
                     </button>
                 </div>
             ) : (
-                <div className="flex flex-col items-center gap-10">
+                <div className="flex flex-col items-center gap-10 mb-8">
                     <div className="flex flex-col sm:flex-row gap-6">
                         <button 
                             onClick={() => { setModalMode('register'); setError(''); setCustomSkin(''); }}
@@ -131,42 +131,42 @@ const Home: React.FC = () => {
                             Login
                         </button>
                     </div>
+                </div>
+            )}
+
+            {/* Contador de Players - Exibido Sempre (Logado ou Não) */}
+            <div className="flex flex-col items-center gap-3">
+                <div 
+                    onClick={handleCopyIp}
+                    className="relative group cursor-pointer"
+                    title="Clique para copiar o IP"
+                >
+                    {/* Glow Effect Background */}
+                    {serverStatus.online && (
+                        <div className="absolute -inset-0.5 bg-green-500/20 rounded-full blur opacity-50 group-hover:opacity-100 transition duration-500"></div>
+                    )}
                     
-                    {/* Contador de Players - Estilo Glass Pill Moderno com Cópia */}
-                    <div className="flex flex-col items-center gap-3 mt-4">
-                        <div 
-                            onClick={handleCopyIp}
-                            className="relative group cursor-pointer"
-                            title="Clique para copiar o IP"
-                        >
-                            {/* Glow Effect Background */}
-                            {serverStatus.online && (
-                                <div className="absolute -inset-0.5 bg-green-500/20 rounded-full blur opacity-50 group-hover:opacity-100 transition duration-500"></div>
-                            )}
-                            
-                            {/* Main Pill Container */}
-                            <div className="relative flex items-center gap-4 bg-black/60 backdrop-blur-md border border-white/10 px-6 py-2 rounded-full shadow-xl transition-transform active:scale-95 hover:border-white/30">
-                                <div className="flex items-center gap-3">
-                                    <div className="relative flex h-2.5 w-2.5">
-                                        {serverStatus.online && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>}
-                                        <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${serverStatus.online ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)]' : 'bg-red-500'}`}></span>
-                                    </div>
-                                    <div className="h-4 w-[1px] bg-white/10"></div> {/* Separator */}
-                                    <span className="font-sans font-bold text-xs tracking-widest text-gray-200 uppercase min-w-[110px] text-center transition-all">
-                                        {copied ? (
-                                            <span className="text-green-400 animate-pulse">IP COPIADO!</span>
-                                        ) : serverStatus.online ? (
-                                            <span className="drop-shadow-sm">{serverStatus.players} <span className="text-gray-500 text-[10px] ml-1">PLAYERS</span></span>
-                                        ) : (
-                                            <span className="text-red-400">OFFLINE</span>
-                                        )}
-                                    </span>
-                                </div>
+                    {/* Main Pill Container */}
+                    <div className="relative flex items-center gap-4 bg-black/60 backdrop-blur-md border border-white/10 px-6 py-2 rounded-full shadow-xl transition-transform active:scale-95 hover:border-white/30">
+                        <div className="flex items-center gap-3">
+                            <div className="relative flex h-2.5 w-2.5">
+                                {serverStatus.online && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>}
+                                <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${serverStatus.online ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)]' : 'bg-red-500'}`}></span>
                             </div>
+                            <div className="h-4 w-[1px] bg-white/10"></div> {/* Separator */}
+                            <span className="font-sans font-bold text-xs tracking-widest text-gray-200 uppercase min-w-[110px] text-center transition-all">
+                                {copied ? (
+                                    <span className="text-green-400 animate-pulse">IP COPIADO!</span>
+                                ) : serverStatus.online ? (
+                                    <span className="drop-shadow-sm">{serverStatus.players} <span className="text-gray-500 text-[10px] ml-1">PLAYERS</span></span>
+                                ) : (
+                                    <span className="text-red-400">OFFLINE</span>
+                                )}
+                            </span>
                         </div>
                     </div>
                 </div>
-            )}
+            </div>
 
             {/* Auth Modal */}
             {modalMode && (
