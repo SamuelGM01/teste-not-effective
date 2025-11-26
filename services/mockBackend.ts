@@ -89,7 +89,7 @@ export const toggleInsignia = async (trainerId: string, badgeId: string): Promis
 const DEFAULT_GYMS: Record<string, Gym> = {};
 const GYM_TYPES_ARR = [
     "agua", "dragao", "eletrico", "fada", "fantasma", "fogo", 
-    "gelo", "inseto", "lutador", "metalico", "normal", "pedra", 
+    "gelo", "inseto", "lutador", "metal", "normal", "pedra", 
     "planta", "psiquico", "sombrio", "terra", "venenoso", "voador"
 ];
 GYM_TYPES_ARR.forEach(t => {

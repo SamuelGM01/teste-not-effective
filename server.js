@@ -15,11 +15,11 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// MongoDB Connection
-const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://Corazon_user:gUDEULzHoaWp0PGo@cluster0.u8wxlkg.mongodb.net/cobblemon?retryWrites=true&w=majority&appName=Cluster0";
+// MongoDB Connection for local development
+const MONGO_URI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/cobblemon";
 
 mongoose.connect(MONGO_URI)
-    .then(() => console.log('✅ Conectado ao MongoDB Atlas'))
+    .then(() => console.log('✅ Conectado ao MongoDB'))
     .catch(err => console.error('❌ Erro no MongoDB:', err));
 
 app.use(cors());
@@ -70,7 +70,7 @@ const Invite = mongoose.model('Invite', InviteSchema);
 // --- INITIALIZATION ---
 const GYM_TYPES = [
     "agua", "dragao", "eletrico", "fada", "fantasma", "fogo", 
-    "gelo", "inseto", "lutador", "metalico", "normal", "pedra", 
+    "gelo", "inseto", "lutador", "metal", "normal", "pedra", 
     "planta", "psiquico", "sombrio", "terra", "venenoso", "voador"
 ];
 
@@ -458,11 +458,16 @@ app.post('/api/invites/:id/respond', async (req, res) => {
 });
 
 // --- SERVE REACT FRONTEND ---
-app.use(express.static(path.join(__dirname, 'dist')));
+// Serve static files from the root directory which contains index.html and other assets.
+app.use(express.static(__dirname));
 
+// The "catchall" handler: for any request that doesn't match one of the API routes above,
+// send back React's index.html file. This is required for single-page applications.
+// Using a regex to avoid path-to-regexp parsing issues with '*' in some environments.
 app.get(/.*/, (req, res) => {
-    res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+    res.sendFile(path.join(__dirname, 'index.html'));
 });
+
 
 app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
