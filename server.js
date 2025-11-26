@@ -1,37 +1,35 @@
+
 import express from 'express';
 import mongoose from 'mongoose';
+import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-// 1. Configurações Iniciais
 dotenv.config();
 
+// Recreate __dirname for ES Modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware para JSON e limites
-app.use(express.json({ limit: '10mb' }));
+// MongoDB Connection
+const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://Corazon_user:gUDEULzHoaWp0PGo@cluster0.u8wxlkg.mongodb.net/?appName=Cluster0";
 
-// Middleware de CORS (Permite conexão do frontend)
-app.use((req, res, next) => {
-    res.header("Access-Control-Allow-Origin", "*");
-    res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
-    if (req.method === 'OPTIONS') {
-        return res.sendStatus(200);
-    }
-    next();
-});
+mongoose.connect(MONGO_URI)
+    .then(() => console.log('✅ Conectado ao MongoDB Atlas'))
+    .catch(err => console.error('❌ Erro no MongoDB:', err));
 
-// --- SCHEMAS (Modelos do Banco) ---
+app.use(cors());
+app.use(express.json({ limit: '10mb' })); // Replaces body-parser
+
+// --- SCHEMAS ---
 
 const TrainerSchema = new mongoose.Schema({
     nick: { type: String, required: true, unique: true },
-    password: { type: String, required: true }, // Em produção, use hash (bcrypt)!
+    password: { type: String, required: true },
     customSkin: String,
     insignias: [String],
     createdAt: { type: Date, default: Date.now }
@@ -44,12 +42,11 @@ const GymSchema = new mongoose.Schema({
     liderSkin: String,
     time: [Object],
     challengers: [String],
-    activeBattle: Object,
-    history: [Object]
+    activeBattle: Object, // GymBattle { id, challengerNick, date, time, status, result }
+    history: [Object] // Array of GymBattle
 });
 const Gym = mongoose.model('Gym', GymSchema);
 
-// Schemas adicionais (mantidos para integridade)
 const TournamentSchema = new mongoose.Schema({
     name: String,
     format: String,
@@ -70,57 +67,38 @@ const InviteSchema = new mongoose.Schema({
 });
 const Invite = mongoose.model('Invite', InviteSchema);
 
-// --- FUNÇÕES DE INICIALIZAÇÃO ---
-
+// --- INITIALIZATION ---
 const GYM_TYPES = [
     "agua", "dragao", "eletrico", "fada", "fantasma", "fogo", 
     "gelo", "inseto", "lutador", "metalico", "normal", "pedra", 
     "planta", "psiquico", "sombrio", "terra", "venenoso", "voador"
 ];
 
-// Função para criar os ginásios se eles não existirem
 const initializeGyms = async () => {
     try {
         const count = await Gym.countDocuments();
         if (count === 0) {
-            console.log("⚙️  Banco vazio detectado. Criando 18 ginásios...");
-            const gymsToCreate = GYM_TYPES.map(tipo => ({
-                tipo,
-                lider: "",
-                time: [null, null, null, null, null, null],
-                challengers: [],
-                activeBattle: null,
-                history: []
-            }));
-            
-            await Gym.insertMany(gymsToCreate);
-            console.log("✅ Ginásios criados com sucesso!");
-        } else {
-            console.log(`ℹ️  ${count} ginásios já encontrados no banco.`);
+            console.log("⚙️ Criando ginásios...");
+            for (const tipo of GYM_TYPES) {
+                await Gym.create({
+                    tipo,
+                    lider: "",
+                    time: [null, null, null, null, null, null],
+                    challengers: [],
+                    activeBattle: null,
+                    history: []
+                });
+            }
         }
     } catch (error) {
-        console.error("❌ Erro fatal ao inicializar ginásios:", error);
-        throw error; // Repassa o erro para parar o servidor se falhar
+        console.error("Erro ao inicializar ginásios:", error);
     }
 };
+initializeGyms();
 
-// --- ROTAS DA API ---
+// --- API ROUTES ---
 
-// Rota de Login
-app.post('/api/login', async (req, res) => {
-    try {
-        const { nick, password } = req.body;
-        // Regex para buscar case-insensitive (ignora maiúsculas/minúsculas)
-        const trainer = await Trainer.findOne({ nick: { $regex: new RegExp(`^${nick}$`, 'i') } });
-        
-        if (!trainer) return res.status(404).json({ error: "Usuário não encontrado" });
-        if (trainer.password !== password) return res.status(401).json({ error: "Senha incorreta" });
-        
-        res.json(trainer);
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// Rotas de Treinadores
+// 1. Trainers
 app.get('/api/trainers', async (req, res) => {
     try {
         const trainers = await Trainer.find();
@@ -140,6 +118,16 @@ app.post('/api/trainers', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+app.post('/api/login', async (req, res) => {
+    try {
+        const { nick, password } = req.body;
+        const trainer = await Trainer.findOne({ nick: { $regex: new RegExp(`^${nick}$`, 'i') } });
+        if (!trainer) return res.status(404).json({ error: "Usuário não encontrado" });
+        if (trainer.password !== password) return res.status(401).json({ error: "Senha incorreta" });
+        res.json(trainer);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.delete('/api/trainers/:id', async (req, res) => {
     try {
         await Trainer.findByIdAndDelete(req.params.id);
@@ -147,14 +135,12 @@ app.delete('/api/trainers/:id', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Rotas de Insígnias
 app.post('/api/insignias', async (req, res) => {
     try {
         const { trainerId, badgeId } = req.body;
         const trainer = await Trainer.findById(trainerId);
         if (!trainer) return res.status(404).json({ error: "Trainer not found" });
 
-        // Lógica de toggle (adicionar ou remover)
         if (trainer.insignias.includes(badgeId)) {
             trainer.insignias = trainer.insignias.filter(b => b !== badgeId);
         } else {
@@ -165,51 +151,319 @@ app.post('/api/insignias', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Rotas de Ginásios (Corrigida e completada)
+// 2. Gyms
 app.get('/api/gyms', async (req, res) => {
     try {
         const gyms = await Gym.find();
-        
-        // Transforma o array em um objeto onde a chave é o tipo do ginásio
-        // Isso facilita para o frontend acessar: gyms['fogo'], gyms['agua']
         const gymMap = {};
         gyms.forEach(g => gymMap[g.tipo] = g);
-        
         res.json(gymMap);
-    } catch (e) { 
-        console.error(e);
-        res.status(500).json({ error: e.message }); 
-    }
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// --- INICIALIZAÇÃO DO SERVIDOR ---
-
-const startServer = async () => {
+app.post('/api/gyms', async (req, res) => {
     try {
-        const mongoUri = process.env.MONGO_URI;
-        if (!mongoUri) {
-            throw new Error("MONGO_URI não definida no arquivo .env");
+        const { tipo, lider, time, liderSkin } = req.body;
+        await Gym.findOneAndUpdate(
+            { tipo }, 
+            { lider, time, liderSkin }, 
+            { upsert: true }
+        );
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/gyms/reset', async (req, res) => {
+    try {
+        const { tipo } = req.body;
+        await Gym.findOneAndUpdate(
+            { tipo }, 
+            { 
+                lider: "", 
+                liderSkin: null, 
+                time: [null,null,null,null,null,null], 
+                challengers: [],
+                activeBattle: null,
+                history: []
+            }
+        );
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/gyms/:tipo/challenge', async (req, res) => {
+    try {
+        const { tipo } = req.params;
+        const { nick } = req.body;
+        
+        const gym = await Gym.findOne({ tipo });
+        if (!gym) return res.status(404).json({ error: "Ginásio não encontrado" });
+
+        if (!gym.challengers) gym.challengers = [];
+
+        if (gym.challengers.includes(nick)) {
+            gym.challengers = gym.challengers.filter(c => c !== nick);
+        } else {
+            gym.challengers.push(nick);
+        }
+        
+        await gym.save();
+        res.json({ success: true, challengers: gym.challengers });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// 3. Tournaments
+app.get('/api/tournaments', async (req, res) => {
+    try {
+        const tournaments = await Tournament.find();
+        res.json(tournaments);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/tournaments', async (req, res) => {
+    try {
+        const { name, format } = req.body;
+        const t = new Tournament({ name, format, participants: [], matches: [] });
+        await t.save();
+        res.json(t);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/tournaments/:id/join', async (req, res) => {
+    try {
+        const { trainerId, nick, customSkin, pokemon, gymType } = req.body;
+        const t = await Tournament.findById(req.params.id);
+        if (!t) return res.status(404).json({ error: "Torneio não encontrado" });
+
+        if (t.participants.some(p => p.trainerId === trainerId)) {
+            return res.status(400).json({ error: "Já inscrito" });
         }
 
-        // 1. Conecta ao MongoDB Atlas
-        console.log("⏳ Conectando ao MongoDB Cluster0...");
-        await mongoose.connect(mongoUri);
-        console.log("✅ Conectado ao MongoDB Atlas (Cluster0)");
+        t.participants.push({ trainerId, nick, customSkin, pokemon, gymType });
+        t.markModified('participants');
+        await t.save();
+        res.json(t);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
-        // 2. Inicializa os dados (Cache/Ginásios)
-        await initializeGyms();
+app.post('/api/tournaments/:id/leave', async (req, res) => {
+    try {
+        const { trainerId } = req.body;
+        const t = await Tournament.findById(req.params.id);
+        if (!t) return res.status(404).json({ error: "Torneio não encontrado" });
 
-        // 3. Abre a porta do servidor
-        app.listen(PORT, () => {
-            console.log(`🚀 Servidor Cobblemon rodando na porta ${PORT}`);
-            console.log(`📡 Acesse em: http://localhost:${PORT}`);
-        });
+        const me = t.participants.find(p => p.trainerId === trainerId);
+        if (me && me.partnerId) {
+            const partner = t.participants.find(p => p.trainerId === me.partnerId);
+            if (partner) {
+                partner.partnerId = undefined;
+                partner.partnerNick = undefined;
+            }
+        }
 
-    } catch (error) {
-        console.error("❌ Falha ao iniciar o servidor:", error);
-        process.exit(1); // Encerra o processo com erro
-    }
-};
+        t.participants = t.participants.filter(p => p.trainerId !== trainerId);
+        t.markModified('participants');
+        await t.save();
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
-// Executa a inicialização
-startServer();
+app.post('/api/tournaments/:id/start', async (req, res) => {
+    try {
+        const t = await Tournament.findById(req.params.id);
+        if (!t) return res.status(404).json({ error: "Torneio não encontrado" });
+
+        const count = t.participants.length;
+        if (count % 2 !== 0) return res.status(400).json({ error: "Número ímpar de jogadores" });
+
+        const shuffled = [...t.participants].sort(() => Math.random() - 0.5);
+        const newMatches = [];
+        const generateId = () => Math.random().toString(36).substr(2, 9);
+
+        if (t.format === 'monotype') {
+            for (let i = 0; i < shuffled.length; i += 2) {
+                newMatches.push({
+                    id: generateId(),
+                    round: 1,
+                    participants: [shuffled[i], shuffled[i+1]],
+                    winners: [],
+                    bans: {}
+                });
+            }
+        } else {
+            const pairs = [];
+            const processedIds = new Set();
+            for (const p of shuffled) {
+                if (processedIds.has(p.trainerId)) continue;
+                const partner = shuffled.find(s => s.trainerId === p.partnerId);
+                if (partner) {
+                    pairs.push([p, partner]);
+                    processedIds.add(p.trainerId);
+                    processedIds.add(partner.trainerId);
+                }
+            }
+            for (let i = 0; i < pairs.length; i += 2) {
+                if (i+1 < pairs.length) {
+                    newMatches.push({
+                        id: generateId(),
+                        round: 1,
+                        participants: [...pairs[i], ...pairs[i+1]],
+                        winners: [],
+                        bans: {}
+                    });
+                }
+            }
+        }
+
+        t.status = 'active';
+        t.currentRound = 1;
+        t.matches = newMatches;
+        t.markModified('matches');
+        await t.save();
+        res.json(t);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/tournaments/:id/matches/:matchId/win', async (req, res) => {
+    try {
+        const { winners } = req.body;
+        const t = await Tournament.findById(req.params.id);
+        const match = t.matches.find(m => m.id === req.params.matchId);
+        if (!match) return res.status(404).json({ error: "Partida não encontrada" });
+
+        match.winners = winners;
+        
+        const roundMatches = t.matches.filter(m => m.round === t.currentRound);
+        const allFinished = roundMatches.every(m => m.winners && m.winners.length > 0);
+
+        if (allFinished) {
+            const winnersIds = roundMatches.flatMap(m => m.winners);
+            const isOver = t.format === 'monotype' ? winnersIds.length === 1 : winnersIds.length === 2;
+
+            if (isOver) {
+                t.status = 'completed';
+            } else {
+                t.currentRound += 1;
+                const nextParticipants = t.participants.filter(p => winnersIds.includes(p.trainerId));
+                const shuffled = nextParticipants.sort(() => Math.random() - 0.5);
+                const generateId = () => Math.random().toString(36).substr(2, 9);
+
+                if (t.format === 'monotype') {
+                    for (let i = 0; i < shuffled.length; i += 2) {
+                        if (i+1 < shuffled.length) {
+                            t.matches.push({ id: generateId(), round: t.currentRound, participants: [shuffled[i], shuffled[i+1]], winners: [], bans: {} });
+                        } else {
+                            t.matches.push({ id: generateId(), round: t.currentRound, participants: [shuffled[i]], winners: [shuffled[i].trainerId], bans: {} });
+                        }
+                    }
+                } else {
+                    const teams = [];
+                    const processedIds = new Set();
+                    for (const p of shuffled) {
+                        if (processedIds.has(p.trainerId)) continue;
+                        const partner = shuffled.find(s => s.trainerId === p.partnerId);
+                        if (partner) {
+                            teams.push([p, partner]);
+                            processedIds.add(p.trainerId);
+                            processedIds.add(partner.trainerId);
+                        }
+                    }
+                    for (let i = 0; i < teams.length; i += 2) {
+                        if (i+1 < teams.length) {
+                            t.matches.push({ id: generateId(), round: t.currentRound, participants: [...teams[i], ...teams[i+1]], winners: [], bans: {} });
+                        } else {
+                            t.matches.push({ id: generateId(), round: t.currentRound, participants: [...teams[i]], winners: teams[i].map(x=>x.trainerId), bans: {} });
+                        }
+                    }
+                }
+            }
+        }
+
+        t.markModified('matches');
+        await t.save();
+        res.json(t);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/tournaments/:id/matches/:matchId/ban', async (req, res) => {
+    try {
+        const { targetTrainerId, pokemonName } = req.body;
+        const t = await Tournament.findById(req.params.id);
+        const match = t.matches.find(m => m.id === req.params.matchId);
+        
+        if (!match.bans) match.bans = {};
+        if (!match.bans[targetTrainerId]) match.bans[targetTrainerId] = [];
+
+        const bans = match.bans[targetTrainerId];
+        if (bans.includes(pokemonName)) {
+            match.bans[targetTrainerId] = bans.filter(n => n !== pokemonName);
+        } else {
+            match.bans[targetTrainerId].push(pokemonName);
+        }
+
+        t.markModified('matches');
+        await t.save();
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// 4. Invites
+app.get('/api/invites', async (req, res) => {
+    try {
+        const { nick } = req.query;
+        const invites = await Invite.find({ toNick: { $regex: new RegExp(`^${nick}$`, 'i') }, status: 'pending' });
+        res.json(invites);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/invites', async (req, res) => {
+    try {
+        const { tournamentId, tournamentName, fromNick, toNick } = req.body;
+        const exists = await Invite.findOne({ tournamentId, fromNick, toNick, status: 'pending' });
+        if (exists) return res.status(400).json({ error: "Convite já enviado" });
+
+        const invite = new Invite({ tournamentId, tournamentName, fromNick, toNick });
+        await invite.save();
+        res.json(invite);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/invites/:id/respond', async (req, res) => {
+    try {
+        const { accept } = req.body;
+        const invite = await Invite.findByIdAndUpdate(req.params.id, { status: accept ? 'accepted' : 'rejected' }, { new: true });
+        
+        if (accept && invite) {
+            const tournament = await Tournament.findById(invite.tournamentId);
+            if (tournament) {
+                const p1Index = tournament.participants.findIndex(p => p.nick === invite.fromNick);
+                const p2Index = tournament.participants.findIndex(p => p.nick === invite.toNick);
+                
+                if (p1Index !== -1 && p2Index !== -1) {
+                    const p1 = tournament.participants[p1Index];
+                    const p2 = tournament.participants[p2Index];
+                    
+                    p1.partnerId = p2.trainerId;
+                    p1.partnerNick = p2.nick;
+                    p2.partnerId = p1.trainerId;
+                    p2.partnerNick = p1.nick;
+                    
+                    tournament.markModified('participants');
+                    await tournament.save();
+                }
+            }
+        }
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// --- SERVE REACT FRONTEND ---
+app.use(express.static(path.join(__dirname, 'dist')));
+
+app.get(/.*/, (req, res) => {
+    res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+});
+
+app.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+});
