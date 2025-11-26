@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { GYM_TYPES, Gym, TYPE_COLORS, getTypeIcon, getSkinUrl, GymBattle } from '../types';
 import * as api from '../services/mockBackend';
@@ -424,20 +425,10 @@ const Gyms: React.FC = () => {
         
         const fetchOnlinePlayers = async () => {
             try {
-                // Switched to a more reliable API and adjusted parsing
-                const response = await fetch(`https://api.mcstatus.io/v2/status/java/jasper.lura.host:35570?_=${new Date().getTime()}`);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const data = await response.json();
-                if (data.players && data.players.list && Array.isArray(data.players.list)) {
-                    // The new API returns a list of objects, we need to map the names
-                    setOnlinePlayers(data.players.list.map((p: any) => p.name_raw));
-                } else {
-                    setOnlinePlayers([]);
-                }
+                const status = await api.getServerStatus();
+                setOnlinePlayers(status.playerList || []);
             } catch (e) {
-                console.error("Failed to fetch online players", e);
+                console.error("Failed to fetch online players via proxy", e);
                 setOnlinePlayers([]);
             }
         };

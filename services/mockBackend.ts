@@ -581,10 +581,11 @@ export const getServerStatus = async () => {
         const data = await response.json();
         return {
             online: data.online,
-            players: data.players?.online ?? 0
+            players: data.players?.online ?? 0,
+            playerList: data.players?.list?.map((p: any) => p.name_raw) ?? []
         };
     } catch (err) {
         console.error("Erro ao buscar status do servidor via proxy", err);
-        return { online: false, players: 0 };
+        return { online: false, players: 0, playerList: [] };
     }
 };
