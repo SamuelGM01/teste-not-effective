@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { GYM_TYPES, Gym, TYPE_COLORS, getTypeIcon, getSkinUrl, GymBattle } from '../types';
 import * as api from '../services/mockBackend';
@@ -670,38 +671,54 @@ const Gyms: React.FC = () => {
                             <div 
                                 key={tipo}
                                 onClick={() => handleOpenGym(tipo)}
-                                className="group cursor-pointer flex flex-col items-center gap-2 transition-transform hover:scale-110"
+                                className="group cursor-pointer flex flex-col items-center gap-3"
                             >
-                                {/* 
-                                    Circular Gym Icon with explicit shadow border for Online status.
-                                    REMOVED animate-pulse-glow which was causing image blur.
-                                    Replaced with explicit box-shadow logic that applies strictly to the container border.
-                                */}
                                 <div 
                                     className={`
-                                        w-20 h-20 rounded-full flex items-center justify-center border-4 transition-all overflow-hidden relative
+                                        relative w-24 h-24 rounded-2xl flex items-center justify-center 
+                                        border transition-all duration-300 backdrop-blur-md overflow-hidden
                                         ${isOnline 
-                                            ? 'border-green-500 shadow-[0_0_15px_rgba(34,197,94,0.8)]' // Stronger shadow, NO opacity animation on container
-                                            : 'border-neutral-800 shadow-lg group-hover:border-white'
+                                            ? 'border-green-500/50 shadow-[0_0_20px_rgba(34,197,94,0.3)]' 
+                                            : 'border-white/10 shadow-black/50 hover:border-white/30 hover:shadow-[0_0_15px_rgba(255,255,255,0.1)]'
                                         }
                                     `}
-                                    style={{ backgroundColor: TYPE_COLORS[tipo] || '#333' }}
+                                    style={{ 
+                                        background: `linear-gradient(135deg, ${TYPE_COLORS[tipo]}33 0%, ${TYPE_COLORS[tipo]}05 100%)`, // Transparent hex alpha
+                                    }}
                                 >
+                                    {/* Inner Glow on Hover */}
+                                    <div 
+                                        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+                                        style={{
+                                            background: `radial-gradient(circle at center, ${TYPE_COLORS[tipo]}40 0%, transparent 70%)`
+                                        }}
+                                    />
+
                                     <img 
                                         src={getTypeIcon(tipo)} 
                                         alt={tipo}
-                                        className="w-12 h-12 object-contain brightness-0 invert opacity-90 drop-shadow-sm"
-                                        style={{ filter: 'none' }} // Force no filter on image
+                                        className="w-12 h-12 object-contain brightness-0 invert opacity-90 drop-shadow-md z-10 transition-transform group-hover:scale-110 duration-300"
+                                        style={{ filter: 'drop-shadow(0 0 5px rgba(0,0,0,0.5))' }}
                                     />
-                                </div>
-                                <div className="flex flex-col items-center">
-                                    <span className="text-xs text-gray-500 font-pixel uppercase group-hover:text-crimson transition-colors">
-                                        {tipo}
-                                    </span>
+
+                                    {/* Minimalist Online Indicator */}
                                     {isOnline && (
-                                        <span className="text-[8px] text-green-400 font-sans font-bold tracking-wider mt-1 drop-shadow-[0_0_5px_rgba(34,197,94,0.5)]">ONLINE</span>
+                                        <div className="absolute top-3 right-3 flex h-2.5 w-2.5 z-20">
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500 shadow-[0_0_5px_rgba(34,197,94,1)]"></span>
+                                        </div>
                                     )}
                                 </div>
+                                
+                                <span 
+                                    className="text-xs font-pixel uppercase tracking-wider transition-colors duration-300"
+                                    style={{ 
+                                        color: isOnline ? '#4ade80' : '#9ca3af',
+                                        textShadow: isOnline ? '0 0 10px rgba(74, 222, 128, 0.3)' : 'none'
+                                    }}
+                                >
+                                    {tipo}
+                                </span>
                             </div>
                         );
                     })}
