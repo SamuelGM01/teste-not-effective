@@ -236,7 +236,7 @@ const GymBackgroundEffect: React.FC<{ type: string }> = ({ type }) => {
                 </div>
             );
 
-        case 'metalico': 
+        case 'metal': 
             return (
                 <div className="absolute inset-0 overflow-hidden pointer-events-none">
                     <div className="absolute inset-0 bg-slate-800/20" />
@@ -425,10 +425,20 @@ const Gyms: React.FC = () => {
         
         const fetchOnlinePlayers = async () => {
             try {
-                const status = await api.getServerStatus();
-                setOnlinePlayers(status.playerList || []);
+                // Switched to a more reliable API and adjusted parsing
+                const response = await fetch(`https://api.mcstatus.io/v2/status/java/jasper.lura.host:35570?_=${new Date().getTime()}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                if (data.players && data.players.list && Array.isArray(data.players.list)) {
+                    // The new API returns a list of objects, we need to map the names
+                    setOnlinePlayers(data.players.list.map((p: any) => p.name_raw));
+                } else {
+                    setOnlinePlayers([]);
+                }
             } catch (e) {
-                console.error("Failed to fetch online players via proxy", e);
+                console.error("Failed to fetch online players", e);
                 setOnlinePlayers([]);
             }
         };
@@ -699,17 +709,11 @@ const Gyms: React.FC = () => {
                                 </div>
                                 
                                 <div className="flex flex-col items-center text-center h-10">
-                                    <span 
-                                        className="text-xs font-pixel uppercase tracking-wider transition-colors duration-300"
-                                        style={{ 
-                                            color: isOnline ? '#4ade80' : '#9ca3af',
-                                            textShadow: isOnline ? '0 0 10px rgba(74, 222, 128, 0.3)' : 'none'
-                                        }}
-                                    >
+                                    <span className="text-xs font-pixel uppercase tracking-wider text-gray-400 transition-colors duration-300">
                                         {tipo}
                                     </span>
                                     {isOnline && (
-                                        <span className="text-[10px] font-pixel uppercase text-green-400 mt-1" style={{ textShadow: '0 0 8px rgba(74, 222, 128, 0.5)' }}>
+                                        <span className="text-[9px] font-pixel uppercase text-green-400 mt-1" style={{ textShadow: '0 0 8px rgba(74, 222, 128, 0.5)' }}>
                                             ONLINE
                                         </span>
                                     )}

@@ -75,7 +75,7 @@ export interface Invite {
 
 export const GYM_TYPES = [
     "agua", "dragao", "eletrico", "fada", "fantasma", "fogo", 
-    "gelo", "inseto", "lutador", "metalico", "normal", "pedra", 
+    "gelo", "inseto", "lutador", "metal", "normal", "pedra", 
     "planta", "psiquico", "sombrio", "terra", "venenoso", "voador"
 ];
 
@@ -89,7 +89,7 @@ export const TYPE_COLORS: Record<string, string> = {
     gelo: "#96D9D6",
     inseto: "#A6B91A",
     lutador: "#C22E28",
-    metalico: "#B7B7CE",
+    metal: "#B7B7CE",
     normal: "#A8A77A",
     pedra: "#B6A136",
     planta: "#7AC74C",
@@ -110,7 +110,7 @@ const TYPE_TRANSLATIONS: Record<string, string> = {
     gelo: "ice",
     inseto: "bug",
     lutador: "fighting",
-    metalico: "steel",
+    metal: "steel",
     normal: "normal",
     pedra: "rock",
     planta: "grass",

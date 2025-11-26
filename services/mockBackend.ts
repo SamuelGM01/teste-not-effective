@@ -89,7 +89,7 @@ export const toggleInsignia = async (trainerId: string, badgeId: string): Promis
 const DEFAULT_GYMS: Record<string, Gym> = {};
 const GYM_TYPES_ARR = [
     "agua", "dragao", "eletrico", "fada", "fantasma", "fogo", 
-    "gelo", "inseto", "lutador", "metalico", "normal", "pedra", 
+    "gelo", "inseto", "lutador", "metal", "normal", "pedra", 
     "planta", "psiquico", "sombrio", "terra", "venenoso", "voador"
 ];
 GYM_TYPES_ARR.forEach(t => {
@@ -569,23 +569,4 @@ export const getPokemonDetails = async (url: string) => {
         name: data.name,
         sprite: sprite
     };
-};
-
-// --- EXTERNAL API (SERVER STATUS PROXY) ---
-export const getServerStatus = async () => {
-    try {
-        const response = await fetch('/api/server-status');
-        if (!response.ok) {
-            throw new Error(`Backend proxy failed with status: ${response.status}`);
-        }
-        const data = await response.json();
-        return {
-            online: data.online,
-            players: data.players?.online ?? 0,
-            playerList: data.players?.list?.map((p: any) => p.name_raw) ?? []
-        };
-    } catch (err) {
-        console.error("Erro ao buscar status do servidor via proxy", err);
-        return { online: false, players: 0, playerList: [] };
-    }
 };

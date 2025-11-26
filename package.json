@@ -15,11 +15,11 @@
     "react-router-dom": "^7.9.6",
     "lucide-react": "^0.554.0",
     "path": "^0.12.7",
-    "express": "^5.1.0",
     "mongoose": "^9.0.0",
+    "cors": "^2.8.5",
     "url": "^0.11.4",
     "dotenv": "^17.2.3",
-    "cors": "^2.8.5"
+    "express": "^5.1.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

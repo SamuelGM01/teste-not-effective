@@ -70,7 +70,7 @@ const Invite = mongoose.model('Invite', InviteSchema);
 // --- INITIALIZATION ---
 const GYM_TYPES = [
     "agua", "dragao", "eletrico", "fada", "fantasma", "fogo", 
-    "gelo", "inseto", "lutador", "metalico", "normal", "pedra", 
+    "gelo", "inseto", "lutador", "metal", "normal", "pedra", 
     "planta", "psiquico", "sombrio", "terra", "venenoso", "voador"
 ];
 
@@ -97,24 +97,6 @@ const initializeGyms = async () => {
 initializeGyms();
 
 // --- API ROUTES ---
-
-// Server Status Proxy
-app.get('/api/server-status', async (req, res) => {
-    try {
-        const response = await fetch(`https://api.mcstatus.io/v2/status/java/jasper.lura.host:35570?_=${new Date().getTime()}`);
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error("mcstatus.io API error:", errorText);
-            return res.status(response.status).json({ online: false, players: { online: 0 }, error: "Failed to fetch from mcstatus.io" });
-        }
-        const data = await response.json();
-        res.json(data);
-    } catch (error) {
-        console.error("Proxy error for /api/server-status:", error);
-        res.status(500).json({ online: false, players: { online: 0 }, error: "Internal server error" });
-    }
-});
-
 
 // 1. Trainers
 app.get('/api/trainers', async (req, res) => {
@@ -481,7 +463,7 @@ app.use(express.static(__dirname));
 
 // The "catchall" handler: for any request that doesn't match one of the API routes above,
 // send back React's index.html file. This is required for single-page applications.
-app.get(/.*/, (req, res) => {
+app.get('/*', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 

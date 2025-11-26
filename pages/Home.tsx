@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import * as api from '../services/mockBackend';
 import { useAuth } from '../contexts/AuthContext';
@@ -19,8 +18,21 @@ const Home: React.FC = () => {
 
     useEffect(() => {
         const fetchServerStatus = async () => {
-            const status = await api.getServerStatus();
-            setServerStatus(status);
+            try {
+                // Switched to a more reliable API endpoint
+                const response = await fetch(`https://api.mcstatus.io/v2/status/java/jasper.lura.host:35570?_=${new Date().getTime()}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                setServerStatus({
+                    online: data.online,
+                    players: data.players ? data.players.online : 0
+                });
+            } catch (err) {
+                console.error("Erro ao buscar status do servidor", err);
+                setServerStatus({ online: false, players: 0 });
+            }
         };
 
         fetchServerStatus();
@@ -133,15 +145,15 @@ const Home: React.FC = () => {
                     className="group cursor-pointer"
                     title="Clique para copiar o IP"
                 >
-                    <div className="relative flex items-center gap-3 bg-darker border border-neutral-800 px-5 py-2.5 rounded-full shadow-lg transition-all hover:border-neutral-600 active:scale-95">
+                    <div className={`relative flex items-center gap-2.5 bg-darker border border-neutral-800 px-4 py-2 rounded-full shadow-lg transition-all hover:border-neutral-600 active:scale-95 ${serverStatus.online ? 'shadow-[0_0_15px_rgba(34,197,94,0.4)]' : ''}`}>
                         {/* Status Dot */}
                         <div className={`w-3 h-3 rounded-full ${serverStatus.online ? 'bg-green-400 shadow-[0_0_8px_rgba(34,197,94,0.8)]' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]'}`}></div>
                         
                         {/* Separator */}
-                        <div className="h-5 w-px bg-neutral-700"></div>
+                        <div className="h-4 w-px bg-neutral-700"></div>
 
                         {/* Text Content */}
-                        <div className="flex items-baseline gap-2 min-w-[120px] justify-center">
+                        <div className="flex items-center gap-2.5 min-w-[100px] justify-center">
                             {copied ? (
                                 <span className="font-pixel text-xs text-green-400 animate-pulse">IP COPIADO!</span>
                             ) : serverStatus.online ? (
