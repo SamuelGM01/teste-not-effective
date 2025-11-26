@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
-import Gyms from './pages/Gyms';
+import GymsPage from './pages/GymsPage';
 import Trainers from './pages/Trainers';
 import Tournaments from './pages/Tournaments';
 import { useAuth } from './contexts/AuthContext';
@@ -91,7 +91,7 @@ const App: React.FC = () => {
                 <main className="flex-grow flex flex-col items-center justify-start py-12 px-4">
                     <Routes>
                         <Route path="/" element={<Home />} />
-                        <Route path="/ginasios" element={<Gyms />} />
+                        <Route path="/ginasios" element={<GymsPage />} />
                         <Route path="/treinadores" element={<Trainers />} />
                         <Route path="/torneios" element={<Tournaments />} />
                         <Route path="*" element={<Navigate to="/" replace />} />

@@ -1,4 +1,3 @@
-
 import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
@@ -16,14 +15,15 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // MongoDB Connection
-const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://Corazon_user:gUDEULzHoaWp0PGo@cluster0.u8wxlkg.mongodb.net/?appName=Cluster0";
+// Utiliza a variável de ambiente ou um fallback. A lógica de replace foi simplificada para evitar corrupção da string.
+let MONGO_URI = process.env.MONGO_URI || "mongodb+srv://Corazon_user:gUDEULzHoaWp0PGo@cluster0.u8wxlkg.mongodb.net/cobblemon_db?appName=Cluster0";
 
-mongoose.connect(MONGO_URI)
-    .then(() => console.log('✅ Conectado ao MongoDB Atlas. Chave de acesso confirmada.'))
-    .catch(err => console.error('❌ Erro no MongoDB (Verifique a chave de acesso):', err));
-
-app.use(cors());
-app.use(express.json({ limit: '10mb' })); // Replaces body-parser
+// Garantir que estamos conectando ao banco correto se a string vier padrão do Atlas sem o nome do DB
+if (!MONGO_URI.includes('cobblemon_db') && MONGO_URI.includes('mongodb.net/')) {
+    MONGO_URI = MONGO_URI.replace('mongodb.net/', 'mongodb.net/cobblemon_db');
+} else if (!MONGO_URI.includes('cobblemon_db') && MONGO_URI.includes('mongodb.net/?')) {
+    MONGO_URI = MONGO_URI.replace('mongodb.net/?', 'mongodb.net/cobblemon_db?');
+}
 
 // --- SCHEMAS ---
 
@@ -34,6 +34,8 @@ const TrainerSchema = new mongoose.Schema({
     insignias: [String],
     createdAt: { type: Date, default: Date.now }
 });
+TrainerSchema.set('toJSON', { virtuals: true });
+TrainerSchema.set('toObject', { virtuals: true });
 const Trainer = mongoose.model('Trainer', TrainerSchema);
 
 const GymSchema = new mongoose.Schema({
@@ -42,8 +44,8 @@ const GymSchema = new mongoose.Schema({
     liderSkin: String,
     time: [Object],
     challengers: [String],
-    activeBattle: Object, // GymBattle { id, challengerNick, date, time, status, result }
-    history: [Object] // Array of GymBattle
+    activeBattle: Object,
+    history: [Object]
 });
 const Gym = mongoose.model('Gym', GymSchema);
 
@@ -56,6 +58,8 @@ const TournamentSchema = new mongoose.Schema({
     currentRound: { type: Number, default: 0 },
     createdAt: { type: Number, default: Date.now }
 });
+TournamentSchema.set('toJSON', { virtuals: true });
+TournamentSchema.set('toObject', { virtuals: true });
 const Tournament = mongoose.model('Tournament', TournamentSchema);
 
 const InviteSchema = new mongoose.Schema({
@@ -65,6 +69,7 @@ const InviteSchema = new mongoose.Schema({
     toNick: String,
     status: { type: String, default: 'pending' }
 });
+InviteSchema.set('toJSON', { virtuals: true });
 const Invite = mongoose.model('Invite', InviteSchema);
 
 // --- INITIALIZATION ---
@@ -78,7 +83,7 @@ const initializeGyms = async () => {
     try {
         const count = await Gym.countDocuments();
         if (count === 0) {
-            console.log("⚙️ Criando ginásios...");
+            console.log("⚙️ Criando ginásios no banco cobblemon_db...");
             for (const tipo of GYM_TYPES) {
                 await Gym.create({
                     tipo,
@@ -89,12 +94,32 @@ const initializeGyms = async () => {
                     history: []
                 });
             }
+            console.log("✅ Ginásios inicializados com sucesso.");
+        } else {
+            console.log(`ℹ️ ${count} ginásios encontrados e carregados do banco.`);
         }
     } catch (error) {
         console.error("Erro ao inicializar ginásios:", error);
     }
 };
-initializeGyms();
+
+mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 5000 })
+    .then(() => {
+        console.log('✅ Conectado ao MongoDB Atlas (cobblemon_db).');
+        initializeGyms();
+    })
+    .catch(err => {
+        console.error('❌ Erro CRÍTICO no MongoDB:', err.message);
+    });
+
+app.use(cors());
+app.use(express.json({ limit: '10mb' }));
+
+// Middleware para desabilitar cache em rotas de API (Garante dados frescos)
+app.use('/api', (req, res, next) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    next();
+});
 
 // --- API ROUTES ---
 
@@ -167,7 +192,7 @@ app.post('/api/gyms', async (req, res) => {
         await Gym.findOneAndUpdate(
             { tipo }, 
             { lider, time, liderSkin }, 
-            { upsert: true }
+            { upsert: true, new: true }
         );
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -211,6 +236,56 @@ app.post('/api/gyms/:tipo/challenge', async (req, res) => {
         res.json({ success: true, challengers: gym.challengers });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
+
+app.post('/api/gyms/:tipo/accept-challenge', async (req, res) => {
+    try {
+        const { tipo } = req.params;
+        const { challengerNick, date, time } = req.body;
+        const gym = await Gym.findOne({ tipo });
+        if (!gym) return res.status(404).json({ error: "Gym not found" });
+        
+        if (gym.challengers) {
+            gym.challengers = gym.challengers.filter(c => c !== challengerNick);
+        }
+        
+        gym.activeBattle = {
+            id: new mongoose.Types.ObjectId(), 
+            challengerNick,
+            date,
+            time,
+            status: 'scheduled'
+        };
+        
+        gym.markModified('challengers');
+        gym.markModified('activeBattle'); 
+        await gym.save();
+        res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/gyms/:tipo/resolve-battle', async (req, res) => {
+    try {
+        const { tipo } = req.params;
+        const { result } = req.body; 
+        const gym = await Gym.findOne({ tipo });
+        
+        if (gym.activeBattle) {
+            const battle = gym.activeBattle;
+            battle.status = 'completed';
+            battle.result = result;
+            
+            if (!gym.history) gym.history = [];
+            gym.history.unshift(battle);
+            gym.activeBattle = null;
+            
+            gym.markModified('history');
+            gym.markModified('activeBattle');
+            await gym.save();
+        }
+        res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 
 // 3. Tournaments
 app.get('/api/tournaments', async (req, res) => {
@@ -455,6 +530,13 @@ app.post('/api/invites/:id/respond', async (req, res) => {
         }
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// --- API FALLBACK HANDLER (CRITICAL FIX) ---
+// Se alguma rota /api/* for chamada e não existir acima, retorne JSON 404.
+// Isso impede que o servidor tente buscar um arquivo HTML (fallthrough) e cause "File not found" com erro de parse no frontend.
+app.all('/api/*', (req, res) => {
+    res.status(404).json({ error: `API endpoint not found: ${req.method} ${req.originalUrl}` });
 });
 
 // --- SERVE REACT FRONTEND ---
