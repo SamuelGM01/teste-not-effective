@@ -5,6 +5,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import https from 'https';
 
 dotenv.config();
 
@@ -210,6 +211,43 @@ app.post('/api/gyms/:tipo/challenge', async (req, res) => {
         await gym.save();
         res.json({ success: true, challengers: gym.challengers });
     } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// New route for server status proxy
+app.get('/api/server-status', (req, res) => {
+    const options = {
+        hostname: 'api.mcstatus.io',
+        port: 443,
+        path: '/v2/status/java/jasper.lura.host:35570',
+        method: 'GET',
+        headers: { 'User-Agent': 'Node.js-Server-Proxy' }
+    };
+
+    const apiReq = https.request(options, apiRes => {
+        let data = '';
+        apiRes.on('data', chunk => {
+            data += chunk;
+        });
+        apiRes.on('end', () => {
+            if (apiRes.statusCode >= 200 && apiRes.statusCode < 300) {
+                try {
+                    const jsonData = JSON.parse(data);
+                    res.json(jsonData);
+                } catch (e) {
+                    res.status(500).json({ online: false, players: { online: 0 } });
+                }
+            } else {
+                 res.status(apiRes.statusCode).json({ online: false, players: { online: 0 } });
+            }
+        });
+    });
+
+    apiReq.on('error', error => {
+        console.error('Error fetching server status:', error);
+        res.status(500).json({ online: false, players: { online: 0 } });
+    });
+
+    apiReq.end();
 });
 
 // 3. Tournaments

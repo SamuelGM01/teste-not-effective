@@ -190,6 +190,26 @@ export const resolveBattle = async (tipo: string, result: 'leader_win' | 'challe
     setLS(KEYS.GYMS, gyms);
 };
 
+// --- SERVER STATUS ---
+export const getServerStatus = async (): Promise<{ online: boolean, players: number }> => {
+    try {
+        // This now calls our own backend proxy
+        const response = await fetch('/api/server-status');
+        if (!response.ok) {
+            console.error('Server status API failed:', response.status);
+            return { online: false, players: 0 };
+        }
+        const data = await response.json();
+        return {
+            online: data.online,
+            players: data.players ? data.players.online : 0
+        };
+    } catch (e) {
+        console.error("Error fetching server status:", e);
+        return { online: false, players: 0 };
+    }
+};
+
 // --- TOURNAMENTS ---
 export const getTournaments = async (): Promise<Tournament[]> => {
     await delay(300);

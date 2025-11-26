@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import * as api from '../services/mockBackend';
 import { useAuth } from '../contexts/AuthContext';
@@ -18,21 +19,9 @@ const Home: React.FC = () => {
 
     useEffect(() => {
         const fetchServerStatus = async () => {
-            try {
-                // Switched to a more reliable API endpoint
-                const response = await fetch(`https://api.mcstatus.io/v2/status/java/jasper.lura.host:35570?_=${new Date().getTime()}`);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const data = await response.json();
-                setServerStatus({
-                    online: data.online,
-                    players: data.players ? data.players.online : 0
-                });
-            } catch (err) {
-                console.error("Erro ao buscar status do servidor", err);
-                setServerStatus({ online: false, players: 0 });
-            }
+            // Now fetches from our abstracted and proxied service
+            const status = await api.getServerStatus();
+            setServerStatus(status);
         };
 
         fetchServerStatus();
