@@ -1,3 +1,4 @@
+
 import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
@@ -15,15 +16,9 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // MongoDB Connection
-// Utiliza a variável de ambiente ou um fallback. A lógica de replace foi simplificada para evitar corrupção da string.
-let MONGO_URI = process.env.MONGO_URI || "mongodb+srv://Corazon_user:gUDEULzHoaWp0PGo@cluster0.u8wxlkg.mongodb.net/cobblemon_db?appName=Cluster0";
-
-// Garantir que estamos conectando ao banco correto se a string vier padrão do Atlas sem o nome do DB
-if (!MONGO_URI.includes('cobblemon_db') && MONGO_URI.includes('mongodb.net/')) {
-    MONGO_URI = MONGO_URI.replace('mongodb.net/', 'mongodb.net/cobblemon_db');
-} else if (!MONGO_URI.includes('cobblemon_db') && MONGO_URI.includes('mongodb.net/?')) {
-    MONGO_URI = MONGO_URI.replace('mongodb.net/?', 'mongodb.net/cobblemon_db?');
-}
+// Utiliza a chave exata fornecida pelo usuário.
+// Removida a lógica que forçava 'cobblemon_db' para garantir acesso aos dados originais (provavelmente no db 'test').
+const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://Corazon_user:gUDEULzHoaWp0PGo@cluster0.u8wxlkg.mongodb.net/?appName=Cluster0";
 
 // --- SCHEMAS ---
 
@@ -83,7 +78,7 @@ const initializeGyms = async () => {
     try {
         const count = await Gym.countDocuments();
         if (count === 0) {
-            console.log("⚙️ Criando ginásios no banco cobblemon_db...");
+            console.log("⚙️ Criando ginásios no banco...");
             for (const tipo of GYM_TYPES) {
                 await Gym.create({
                     tipo,
@@ -104,8 +99,8 @@ const initializeGyms = async () => {
 };
 
 mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 5000 })
-    .then(() => {
-        console.log('✅ Conectado ao MongoDB Atlas (cobblemon_db).');
+    .then((conn) => {
+        console.log(`✅ Conectado ao MongoDB Atlas. Database em uso: [${conn.connection.name}]`);
         initializeGyms();
     })
     .catch(err => {
