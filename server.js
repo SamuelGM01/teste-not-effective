@@ -5,7 +5,6 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { v4 as uuidv4 } from 'uuid';
 
 dotenv.config();
 
@@ -17,16 +16,14 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // MongoDB Connection
-// Connecting to Cluster0 as requested to access previous version info
 const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://Corazon_user:gUDEULzHoaWp0PGo@cluster0.u8wxlkg.mongodb.net/cobblemon?retryWrites=true&w=majority&appName=Cluster0";
 
-mongoose.set('strictQuery', false); // Allow flexibility for older schemas
 mongoose.connect(MONGO_URI)
-    .then(() => console.log('✅ Conectado ao MongoDB Atlas (Cluster0 - Not Effective)'))
+    .then(() => console.log('✅ Conectado ao MongoDB Atlas'))
     .catch(err => console.error('❌ Erro no MongoDB:', err));
 
 app.use(cors());
-app.use(express.json({ limit: '10mb' })); 
+app.use(express.json({ limit: '10mb' })); // Replaces body-parser
 
 // --- SCHEMAS ---
 
@@ -36,7 +33,7 @@ const TrainerSchema = new mongoose.Schema({
     customSkin: String,
     insignias: [String],
     createdAt: { type: Date, default: Date.now }
-}, { collection: 'trainers' }); 
+});
 const Trainer = mongoose.model('Trainer', TrainerSchema);
 
 const GymSchema = new mongoose.Schema({
@@ -47,7 +44,7 @@ const GymSchema = new mongoose.Schema({
     challengers: [String],
     activeBattle: Object, // GymBattle { id, challengerNick, date, time, status, result }
     history: [Object] // Array of GymBattle
-}, { collection: 'gyms' });
+});
 const Gym = mongoose.model('Gym', GymSchema);
 
 const TournamentSchema = new mongoose.Schema({
@@ -58,7 +55,7 @@ const TournamentSchema = new mongoose.Schema({
     matches: [Object],
     currentRound: { type: Number, default: 0 },
     createdAt: { type: Number, default: Date.now }
-}, { collection: 'tournaments' });
+});
 const Tournament = mongoose.model('Tournament', TournamentSchema);
 
 const InviteSchema = new mongoose.Schema({
@@ -67,7 +64,7 @@ const InviteSchema = new mongoose.Schema({
     fromNick: String,
     toNick: String,
     status: { type: String, default: 'pending' }
-}, { collection: 'invites' });
+});
 const Invite = mongoose.model('Invite', InviteSchema);
 
 // --- INITIALIZATION ---
@@ -81,7 +78,7 @@ const initializeGyms = async () => {
     try {
         const count = await Gym.countDocuments();
         if (count === 0) {
-            console.log("⚙️ Criando ginásios (Initial Setup)...");
+            console.log("⚙️ Criando ginásios...");
             for (const tipo of GYM_TYPES) {
                 await Gym.create({
                     tipo,
@@ -215,52 +212,6 @@ app.post('/api/gyms/:tipo/challenge', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Battle Routes
-app.post('/api/gyms/:tipo/battle/accept', async (req, res) => {
-    try {
-        const { tipo } = req.params;
-        const { challengerNick, date, time } = req.body;
-        const gym = await Gym.findOne({ tipo });
-        if (!gym) return res.status(404).json({ error: "Ginásio não encontrado" });
-
-        if (gym.challengers) {
-            gym.challengers = gym.challengers.filter(c => c !== challengerNick);
-        }
-
-        gym.activeBattle = {
-            id: uuidv4(),
-            challengerNick,
-            date,
-            time,
-            status: 'scheduled'
-        };
-
-        await gym.save();
-        res.json({ success: true });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/gyms/:tipo/battle/resolve', async (req, res) => {
-    try {
-        const { tipo } = req.params;
-        const { result } = req.body; // 'leader_win' | 'challenger_win'
-        const gym = await Gym.findOne({ tipo });
-        if (!gym || !gym.activeBattle) return res.status(400).json({ error: "Nenhuma batalha ativa" });
-
-        const battle = gym.activeBattle;
-        battle.status = 'completed';
-        battle.result = result;
-
-        if (!gym.history) gym.history = [];
-        gym.history.unshift(battle);
-        gym.activeBattle = null;
-
-        await gym.save();
-        res.json({ success: true });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-
 // 3. Tournaments
 app.get('/api/tournaments', async (req, res) => {
     try {
@@ -327,7 +278,7 @@ app.post('/api/tournaments/:id/start', async (req, res) => {
 
         const shuffled = [...t.participants].sort(() => Math.random() - 0.5);
         const newMatches = [];
-        const generateId = () => uuidv4();
+        const generateId = () => Math.random().toString(36).substr(2, 9);
 
         if (t.format === 'monotype') {
             for (let i = 0; i < shuffled.length; i += 2) {
@@ -395,7 +346,7 @@ app.post('/api/tournaments/:id/matches/:matchId/win', async (req, res) => {
                 t.currentRound += 1;
                 const nextParticipants = t.participants.filter(p => winnersIds.includes(p.trainerId));
                 const shuffled = nextParticipants.sort(() => Math.random() - 0.5);
-                const generateId = () => uuidv4();
+                const generateId = () => Math.random().toString(36).substr(2, 9);
 
                 if (t.format === 'monotype') {
                     for (let i = 0; i < shuffled.length; i += 2) {
@@ -507,12 +458,16 @@ app.post('/api/invites/:id/respond', async (req, res) => {
 });
 
 // --- SERVE REACT FRONTEND ---
-app.use(express.static(path.join(__dirname, 'dist')));
+// Serve static files from the root directory which contains index.html and other assets.
+app.use(express.static(__dirname));
 
-app.get(/.*/, (req, res) => {
-    res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+// The "catchall" handler: for any request that doesn't match one of the API routes above,
+// send back React's index.html file. This is required for single-page applications.
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
 });
 
+
 app.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT} connected to MongoDB`);
+    console.log(`🚀 Server running on port ${PORT}`);
 });

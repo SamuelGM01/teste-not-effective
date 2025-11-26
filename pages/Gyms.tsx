@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { GYM_TYPES, Gym, TYPE_COLORS, getTypeIcon, getSkinUrl, GymBattle } from '../types';
 import * as api from '../services/mockBackend';
@@ -235,7 +236,7 @@ const GymBackgroundEffect: React.FC<{ type: string }> = ({ type }) => {
                 </div>
             );
 
-        case 'metalico': 
+        case 'metal': 
             return (
                 <div className="absolute inset-0 overflow-hidden pointer-events-none">
                     <div className="absolute inset-0 bg-slate-800/20" />
@@ -424,18 +425,21 @@ const Gyms: React.FC = () => {
         
         const fetchOnlinePlayers = async () => {
             try {
-                // Using mcstatus.io as it provides a structured player list object
-                const response = await fetch(`https://api.mcstatus.io/v2/status/java/jasper.lura.host:35570`);
+                // Switched to a more reliable API and adjusted parsing
+                const response = await fetch(`https://api.mcstatus.io/v2/status/java/jasper.lura.host:35570?_=${new Date().getTime()}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
                 const data = await response.json();
-                if (data.online && data.players && Array.isArray(data.players.list)) {
-                    // Map the player objects to names
-                    const names = data.players.list.map((p: any) => p.name_clean || p.name_raw || p.name);
-                    setOnlinePlayers(names);
+                if (data.players && data.players.list && Array.isArray(data.players.list)) {
+                    // The new API returns a list of objects, we need to map the names
+                    setOnlinePlayers(data.players.list.map((p: any) => p.name_raw));
                 } else {
                     setOnlinePlayers([]);
                 }
             } catch (e) {
                 console.error("Failed to fetch online players", e);
+                setOnlinePlayers([]);
             }
         };
 
@@ -678,14 +682,14 @@ const Gyms: React.FC = () => {
                                 <div 
                                     className={`
                                         relative w-24 h-24 rounded-full flex items-center justify-center 
-                                        border transition-all duration-300 backdrop-blur-md overflow-hidden
+                                        transition-all duration-300 backdrop-blur-md overflow-hidden
                                         ${isOnline 
-                                            ? 'border-green-500/50 shadow-[0_0_20px_rgba(34,197,94,0.3)]' 
-                                            : 'border-white/10 shadow-black/50 hover:border-white/30 hover:shadow-[0_0_15px_rgba(255,255,255,0.1)]'
+                                            ? 'border-2 border-green-500 shadow-[0_0_20px_rgba(34,197,94,0.4)]' 
+                                            : 'border border-white/10 shadow-black/50 hover:border-white/30 hover:shadow-[0_0_15px_rgba(255,255,255,0.1)]'
                                         }
                                     `}
                                     style={{ 
-                                        background: `linear-gradient(135deg, ${TYPE_COLORS[tipo]}33 0%, ${TYPE_COLORS[tipo]}05 100%)`, // Transparent hex alpha
+                                        background: `linear-gradient(135deg, ${TYPE_COLORS[tipo]}33 0%, ${TYPE_COLORS[tipo]}05 100%)`,
                                     }}
                                 >
                                     {/* Inner Glow on Hover */}
@@ -702,25 +706,18 @@ const Gyms: React.FC = () => {
                                         className="w-12 h-12 object-contain brightness-0 invert opacity-90 drop-shadow-md z-10 transition-transform group-hover:scale-110 duration-300"
                                         style={{ filter: 'drop-shadow(0 0 5px rgba(0,0,0,0.5))' }}
                                     />
-
-                                    {/* Minimalist Online Indicator */}
-                                    {isOnline && (
-                                        <div className="absolute top-3 right-3 flex h-2.5 w-2.5 z-20">
-                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500 shadow-[0_0_5px_rgba(34,197,94,1)]"></span>
-                                        </div>
-                                    )}
                                 </div>
                                 
-                                <span 
-                                    className="text-xs font-pixel uppercase tracking-wider transition-colors duration-300"
-                                    style={{ 
-                                        color: isOnline ? '#4ade80' : '#9ca3af',
-                                        textShadow: isOnline ? '0 0 10px rgba(74, 222, 128, 0.3)' : 'none'
-                                    }}
-                                >
-                                    {tipo}
-                                </span>
+                                <div className="flex flex-col items-center text-center h-10">
+                                    <span className="text-xs font-pixel uppercase tracking-wider text-gray-400 transition-colors duration-300">
+                                        {tipo}
+                                    </span>
+                                    {isOnline && (
+                                        <span className="text-[9px] font-pixel uppercase text-green-400 mt-1" style={{ textShadow: '0 0 8px rgba(74, 222, 128, 0.5)' }}>
+                                            ONLINE
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                         );
                     })}
