@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { GYM_TYPES, Gym, TYPE_COLORS, getTypeIcon, getSkinUrl, GymBattle } from '../types';
 import * as api from '../services/mockBackend';
@@ -236,7 +235,7 @@ const GymBackgroundEffect: React.FC<{ type: string }> = ({ type }) => {
                 </div>
             );
 
-        case 'metal': 
+        case 'metalico': 
             return (
                 <div className="absolute inset-0 overflow-hidden pointer-events-none">
                     <div className="absolute inset-0 bg-slate-800/20" />
@@ -709,11 +708,17 @@ const Gyms: React.FC = () => {
                                 </div>
                                 
                                 <div className="flex flex-col items-center text-center h-10">
-                                    <span className="text-xs font-pixel uppercase tracking-wider text-gray-400 transition-colors duration-300">
+                                    <span 
+                                        className="text-xs font-pixel uppercase tracking-wider transition-colors duration-300"
+                                        style={{ 
+                                            color: isOnline ? '#4ade80' : '#9ca3af',
+                                            textShadow: isOnline ? '0 0 10px rgba(74, 222, 128, 0.3)' : 'none'
+                                        }}
+                                    >
                                         {tipo}
                                     </span>
                                     {isOnline && (
-                                        <span className="text-[9px] font-pixel uppercase text-green-400 mt-1" style={{ textShadow: '0 0 8px rgba(74, 222, 128, 0.5)' }}>
+                                        <span className="text-[10px] font-pixel uppercase text-green-400 mt-1" style={{ textShadow: '0 0 8px rgba(74, 222, 128, 0.5)' }}>
                                             ONLINE
                                         </span>
                                     )}

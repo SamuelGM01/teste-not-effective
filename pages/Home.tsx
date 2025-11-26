@@ -145,15 +145,15 @@ const Home: React.FC = () => {
                     className="group cursor-pointer"
                     title="Clique para copiar o IP"
                 >
-                    <div className={`relative flex items-center gap-2.5 bg-darker border border-neutral-800 px-4 py-2 rounded-full shadow-lg transition-all hover:border-neutral-600 active:scale-95 ${serverStatus.online ? 'shadow-[0_0_15px_rgba(34,197,94,0.4)]' : ''}`}>
+                    <div className="relative flex items-center gap-3 bg-darker border border-neutral-800 px-5 py-2.5 rounded-full shadow-lg transition-all hover:border-neutral-600 active:scale-95">
                         {/* Status Dot */}
                         <div className={`w-3 h-3 rounded-full ${serverStatus.online ? 'bg-green-400 shadow-[0_0_8px_rgba(34,197,94,0.8)]' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]'}`}></div>
                         
                         {/* Separator */}
-                        <div className="h-4 w-px bg-neutral-700"></div>
+                        <div className="h-5 w-px bg-neutral-700"></div>
 
                         {/* Text Content */}
-                        <div className="flex items-center gap-2.5 min-w-[100px] justify-center">
+                        <div className="flex items-baseline gap-2 min-w-[120px] justify-center">
                             {copied ? (
                                 <span className="font-pixel text-xs text-green-400 animate-pulse">IP COPIADO!</span>
                             ) : serverStatus.online ? (
