@@ -19,8 +19,8 @@ const PORT = process.env.PORT || 3000;
 const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://Corazon_user:gUDEULzHoaWp0PGo@cluster0.u8wxlkg.mongodb.net/?appName=Cluster0";
 
 mongoose.connect(MONGO_URI)
-    .then(() => console.log('✅ Conectado ao MongoDB Atlas'))
-    .catch(err => console.error('❌ Erro no MongoDB:', err));
+    .then(() => console.log('✅ Conectado ao MongoDB Atlas. Chave de acesso confirmada.'))
+    .catch(err => console.error('❌ Erro no MongoDB (Verifique a chave de acesso):', err));
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' })); // Replaces body-parser
